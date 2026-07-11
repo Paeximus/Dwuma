@@ -1,50 +1,47 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);1591</NoWarn>
-    <ImplicitUsings>enable</ImplicitUsings>
-	<UserSecretsId>dwuma-12345-unique-guid</UserSecretsId>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UserSecretsId>dwuma-12345-unique-guid</UserSecretsId>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="MLModels\JobRanker.zip" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
 
-  <ItemGroup>
-    <Content Include="MLModels\JobRanker.zip">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.17" />
 
-  <ItemGroup>
-    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.17" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.17">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.17" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.17">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.ML" Version="5.0.0" />
-    <PackageReference Include="Microsoft.ML" Version="5.0.0" />
-    <PackageReference Include="Microsoft.ML.FastTree" Version="5.0.0" />
-    <PackageReference Include="Microsoft.ML.LightGbm" Version="5.0.0" />
-    <PackageReference Include="Microsoft.ML.Recommender" Version="0.23.0" />
-    <PackageReference Include="PdfPig" Version="0.1.14" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
-  </ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.17">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>
+				runtime; build; native; contentfiles;
+				analyzers; buildtransitive
+			</IncludeAssets>
+		</PackageReference>
 
-  <ItemGroup>
-    <Folder Include="wwwroot\" />
-    <Folder Include="Shared\css\" />
-    <Folder Include="Shared\pages\" />
-    <Folder Include="Shared\js\" />
-  </ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.17" />
+
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.17">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>
+				runtime; build; native; contentfiles;
+				analyzers; buildtransitive
+			</IncludeAssets>
+		</PackageReference>
+
+		<PackageReference Include="PdfPig" Version="0.1.14" />
+
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Folder Include="wwwroot\" />
+		<Folder Include="Shared\css\" />
+		<Folder Include="Shared\pages\" />
+		<Folder Include="Shared\js\" />
+	</ItemGroup>
 
 </Project>

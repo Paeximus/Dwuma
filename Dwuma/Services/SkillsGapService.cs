@@ -1,155 +1,391 @@
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Dwuma.Models;
 
-namespace Dwuma.Services
+namespace Dwuma.Services;
+
+public sealed class SkillsGapService
 {
-    public class SkillsGapService
+    private readonly GeminiService _geminiService;
+    private readonly ILogger<SkillsGapService> _logger;
+
+    public SkillsGapService(
+        GeminiService geminiService,
+        ILogger<SkillsGapService> logger)
     {
-        private readonly HttpClient _httpClient;
-        private readonly string _geminiKey;
-        private readonly ILogger<SkillsGapService> _logger;
-
-        public SkillsGapService(HttpClient httpClient, IConfiguration config, ILogger<SkillsGapService> logger)
-        {
-            _httpClient = httpClient;
-            _geminiKey = config["Gemini:ApiKey"] ?? throw new Exception("Gemini API key not configured.");
-            _logger = logger;
-        }
-
-        public async Task<SkillsGapResponse> AnalyseAsync(SkillsGapRequest request)
-        {
-            var prompt = BuildPrompt(request);
-            var rawJson = await CallGeminiAsync(prompt);
-            return ParseResponse(rawJson);
-        }
-
-        // ─── PROMPT CONSTRUCTION ─────────────────────────────────────────────
-
-        private static string BuildPrompt(SkillsGapRequest r)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("You are an expert career advisor specialising in the Ghanaian job market.");
-            sb.AppendLine("Perform a structured skills gap analysis and return ONLY valid JSON — no markdown, no preamble.");
-            sb.AppendLine();
-            sb.AppendLine("USER PROFILE:");
-            sb.AppendLine($"- Current skills: {string.Join(", ", r.Skills)}");
-            if (!string.IsNullOrWhiteSpace(r.Education))   sb.AppendLine($"- Education: {r.Education} in {r.FieldOfStudy}");
-            if (!string.IsNullOrWhiteSpace(r.Experience))  sb.AppendLine($"- Years of experience: {r.Experience}");
-            sb.AppendLine();
-            sb.AppendLine("TARGET ROLE:");
-            sb.AppendLine($"- Job Title: {r.JobTitle}");
-            if (!string.IsNullOrWhiteSpace(r.Industry))    sb.AppendLine($"- Industry: {r.Industry}");
-            if (!string.IsNullOrWhiteSpace(r.JobDescription))
-            {
-                sb.AppendLine("- Job Description:");
-                sb.AppendLine(r.JobDescription);
-            }
-            sb.AppendLine();
-            sb.AppendLine("INSTRUCTIONS:");
-            sb.AppendLine("1. Identify the key skills required for this role.");
-            sb.AppendLine("2. For each skill, assess whether the user has it (present), partially has it (partial), or lacks it (absent).");
-            sb.AppendLine("3. For absent/partial skills, recommend specific learning resources available to Ghanaian graduates.");
-            sb.AppendLine("4. Calculate an overall match percentage (0–100).");
-            sb.AppendLine("5. Write a 2–3 sentence honest but encouraging summary.");
-            sb.AppendLine();
-            sb.AppendLine("Return ONLY this JSON structure:");
-            sb.AppendLine(@"{
-  ""matchPercentage"": 72,
-  ""summary"": ""..."",
-  ""skills"": [
-    {
-      ""name"": ""Python"",
-      ""status"": ""present"",
-      ""level"": ""intermediate"",
-      ""description"": ""You listed Python and it is core to this role.""
-    },
-    {
-      ""name"": ""Machine Learning"",
-      ""status"": ""absent"",
-      ""level"": ""intermediate"",
-      ""description"": ""Most data analyst roles in Ghana now expect basic ML knowledge.""
+        _geminiService = geminiService;
+        _logger = logger;
     }
-  ],
-  ""resources"": [
-    {
-      ""name"": ""Machine Learning Specialisation"",
-      ""platform"": ""Coursera"",
-      ""description"": ""Andrew Ng's beginner-friendly ML course. Audit for free."",
-      ""url"": ""https://www.coursera.org/specializations/machine-learning-introduction"",
-      ""isFree"": true
-    }
-  ]
-}");
 
-            return sb.ToString();
+    public async Task<SkillsGapResponse> AnalyseAsync(
+        SkillsGapRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateRequest(request);
+
+        string prompt = BuildPrompt(request);
+
+        string rawJson =
+    await _geminiService.GenerateJsonAsync(
+        prompt,
+        responseSchema: CreateResponseSchema(),
+        maxOutputTokens: 5000,
+        cancellationToken: cancellationToken);
+
+        return ParseResponse(rawJson);
+    }
+
+    private static void ValidateRequest(
+        SkillsGapRequest request)
+    {
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
         }
 
-
-        private async Task<string> CallGeminiAsync(string prompt)
+        if (string.IsNullOrWhiteSpace(request.JobTitle))
         {
-            var requestBody = new
+            throw new ArgumentException(
+                "The target job title is required.");
+        }
+
+        request.Skills ??= [];
+    }
+
+    private static string BuildPrompt(
+        SkillsGapRequest request)
+    {
+        var prompt = new StringBuilder();
+
+        prompt.AppendLine(
+            "You are an expert career adviser familiar with graduate employment in Ghana.");
+
+        prompt.AppendLine(
+            "Analyse the candidate against the target role.");
+
+        prompt.AppendLine(
+            "Do not claim that a skill is present unless the candidate supplied evidence for it.");
+
+        prompt.AppendLine();
+        prompt.AppendLine("CANDIDATE PROFILE");
+        prompt.AppendLine(
+            $"Skills: {string.Join(", ", request.Skills)}");
+
+        if (!string.IsNullOrWhiteSpace(request.Education))
+        {
+            prompt.AppendLine(
+                $"Education: {request.Education}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FieldOfStudy))
+        {
+            prompt.AppendLine(
+                $"Field of study: {request.FieldOfStudy}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Experience))
+        {
+            prompt.AppendLine(
+                $"Experience: {request.Experience}");
+        }
+
+        prompt.AppendLine();
+        prompt.AppendLine("TARGET ROLE");
+        prompt.AppendLine($"Job title: {request.JobTitle}");
+
+        if (!string.IsNullOrWhiteSpace(request.Industry))
+        {
+            prompt.AppendLine(
+                $"Industry: {request.Industry}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(
+            request.JobDescription))
+        {
+            prompt.AppendLine("Job description:");
+            prompt.AppendLine(request.JobDescription);
+        }
+
+        prompt.AppendLine();
+        prompt.AppendLine("INSTRUCTIONS");
+        prompt.AppendLine(
+            "1. Identify the most important skills for the role.");
+
+        prompt.AppendLine(
+            "2. Mark every skill as present, partial, or absent.");
+
+        prompt.AppendLine(
+            "3. Provide a required level: foundational, intermediate, or advanced.");
+
+        prompt.AppendLine(
+            "4. Recommend practical learning resources for partial or absent skills.");
+
+        prompt.AppendLine(
+            "5. Prefer free resources or resources that can be audited for free.");
+
+        prompt.AppendLine(
+            "6. Calculate a realistic match percentage from 0 to 100.");
+
+        prompt.AppendLine(
+            "Return no more than 8 skill items and no more than 5 learning resources.");
+
+        prompt.AppendLine(
+            "Keep the summary under 80 words.");
+
+        prompt.AppendLine(
+            "Keep each skill description under 35 words.");
+
+        prompt.AppendLine(
+            "Keep each resource description under 30 words.");
+
+        prompt.AppendLine(
+            "7. Return valid JSON only.");
+
+        prompt.AppendLine();
+        prompt.AppendLine("RETURN THIS EXACT JSON STRUCTURE:");
+
+        prompt.AppendLine(
+            """
             {
-                model = "gpt-4o",
-                max_tokens = 2000,
-                temperature = 0.4,
-                messages = new[]
+              "matchPercentage": 72,
+              "summary": "A brief honest and encouraging assessment.",
+              "skills": [
                 {
-                    new { role = "system", content = "You are a career advisor AI. Always respond with valid JSON only." },
-                    new { role = "user",   content = prompt }
+                  "name": "SQL",
+                  "status": "present",
+                  "level": "intermediate",
+                  "description": "Explanation of the assessment."
                 }
+              ],
+              "resources": [
+                {
+                  "name": "Resource name",
+                  "platform": "Platform name",
+                  "description": "Why this resource is useful.",
+                  "url": "https://example.com",
+                  "isFree": true
+                }
+              ]
+            }
+            """);
+
+        return prompt.ToString();
+    }
+
+    private static object CreateResponseSchema()
+    {
+        return new
+        {
+            type = "object",
+
+            properties = new
+            {
+                matchPercentage = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = 100
+                },
+
+                summary = new
+                {
+                    type = "string"
+                },
+
+                skills = new
+                {
+                    type = "array",
+                    maxItems = 8,
+
+                    items = new
+                    {
+                        type = "object",
+
+                        properties = new
+                        {
+                            name = new
+                            {
+                                type = "string"
+                            },
+
+                            status = new
+                            {
+                                type = "string",
+
+                                @enum = new[]
+                                {
+                                "present",
+                                "partial",
+                                "absent"
+                            }
+                            },
+
+                            level = new
+                            {
+                                type = "string",
+
+                                @enum = new[]
+                                {
+                                "foundational",
+                                "intermediate",
+                                "advanced"
+                            }
+                            },
+
+                            description = new
+                            {
+                                type = "string"
+                            }
+                        },
+
+                        required = new[]
+                        {
+                        "name",
+                        "status",
+                        "level",
+                        "description"
+                    }
+                    }
+                },
+
+                resources = new
+                {
+                    type = "array",
+                    maxItems = 5,
+
+                    items = new
+                    {
+                        type = "object",
+
+                        properties = new
+                        {
+                            name = new
+                            {
+                                type = "string"
+                            },
+
+                            platform = new
+                            {
+                                type = "string"
+                            },
+
+                            description = new
+                            {
+                                type = "string"
+                            },
+
+                            url = new
+                            {
+                                type = "string"
+                            },
+
+                            isFree = new
+                            {
+                                type = "boolean"
+                            }
+                        },
+
+                        required = new[]
+                        {
+                        "name",
+                        "platform",
+                        "description",
+                        "url",
+                        "isFree"
+                    }
+                    }
+                }
+            },
+
+            required = new[]
+            {
+            "matchPercentage",
+            "summary",
+            "skills",
+            "resources"
+        }
+        };
+    }
+
+    private SkillsGapResponse ParseResponse(
+    string rawJson)
+    {
+        try
+        {
+            string cleaned = ExtractJson(rawJson);
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
             };
 
-            var content = new StringContent(
-                JsonSerializer.Serialize(requestBody),
-                Encoding.UTF8,
-                "application/json"
-            );
+            SkillsGapResponse? result =
+                JsonSerializer.Deserialize<SkillsGapResponse>(
+                    cleaned,
+                    options);
 
-            _httpClient.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", _geminiKey);
-
-            var response = await _httpClient.PostAsync("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + _geminiKey, content);
-
-            if (!response.IsSuccessStatusCode)
+            if (result is null)
             {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                _logger.LogError("GeminiAI error: {Status} — {Body}", response.StatusCode, errorBody);
-                throw new Exception($"GeminiAI API error: {response.StatusCode}");
+                throw new InvalidOperationException(
+                    "Gemini returned an empty skills-gap result.");
             }
 
-            var responseJson = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(responseJson);
+            result.Skills ??= [];
+            result.Resources ??= [];
 
-            // Extract the assistant message content
-            return doc.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString() ?? throw new Exception("Empty response from GeminiAI.");
+            result.MatchPercentage = Math.Clamp(
+                result.MatchPercentage,
+                0,
+                100);
+
+            return result;
         }
-
-
-        private SkillsGapResponse ParseResponse(string rawJson)
+        catch (JsonException ex)
         {
-            // Strip any accidental markdown fences
-            var cleaned = rawJson.Trim();
-            if (cleaned.StartsWith("```")) cleaned = cleaned.Split('\n', 2)[1];
-            if (cleaned.EndsWith("```"))   cleaned = cleaned[..^3];
-            cleaned = cleaned.Trim();
+            _logger.LogError(
+                ex,
+                "Unable to parse skills-gap JSON: {RawJson}",
+                rawJson);
 
-            try
+            throw new InvalidOperationException(
+                "The AI returned an invalid skills-gap response.",
+                ex);
+        }
+    }
+
+    private static string ExtractJson(
+        string raw)
+    {
+        string cleaned = raw.Trim();
+
+        if (cleaned.StartsWith("```"))
+        {
+            int firstNewLine =
+                cleaned.IndexOf('\n');
+
+            if (firstNewLine >= 0)
             {
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                return JsonSerializer.Deserialize<SkillsGapResponse>(cleaned, options)
-                    ?? throw new Exception("Null deserialization result.");
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "Failed to parse GPT-4o response: {Raw}", rawJson);
-                throw new Exception("AI returned an unexpected format. Please try again.");
+                cleaned =
+                    cleaned[(firstNewLine + 1)..];
             }
         }
+
+        if (cleaned.EndsWith("```"))
+        {
+            cleaned = cleaned[..^3];
+        }
+
+        int start = cleaned.IndexOf('{');
+        int end = cleaned.LastIndexOf('}');
+
+        if (start < 0 || end <= start)
+        {
+            throw new JsonException(
+                "No JSON object was found.");
+        }
+
+        return cleaned.Substring(
+            start,
+            end - start + 1);
     }
 }

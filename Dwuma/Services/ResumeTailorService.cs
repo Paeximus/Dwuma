@@ -32,7 +32,12 @@ namespace Dwuma.Services
                 "Tailoring CV for role {Role}",
                 request.JobTitle);
 
-            var rawResponse = await _gemini.GenerateAsync(prompt, 3000, cancellationToken);
+            var rawResponse =
+      await _gemini.GenerateJsonAsync(
+          prompt,
+          responseSchema: null,
+          maxOutputTokens: 5000,
+          cancellationToken: cancellationToken);
 
             _logger.LogInformation("Gemini Response:\n{Response}", rawResponse);
 
