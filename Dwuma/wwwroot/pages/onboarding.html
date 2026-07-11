@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Get Started — Career Agent</title>
+  <link rel="stylesheet" href="../css/main.css" />
+  <style>
+    /* ── Onboarding-specific styles ── */
+    .onboarding-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+    }
+
+    /* Sidebar */
+    .onboarding-sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 48px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .sidebar-brand {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 40px;
+    }
+
+    .sidebar-step {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      cursor: default;
+      transition: background 0.2s;
+    }
+
+    .step-dot {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: all 0.3s;
+      color: var(--text-muted);
+    }
+
+    .sidebar-step.active   .step-dot { border-color: var(--accent); background: var(--accent); color: #0a0e1a; }
+    .sidebar-step.done     .step-dot { border-color: var(--accent); background: transparent; color: var(--accent); }
+    .sidebar-step.active              { background: rgba(0,212,170,0.06); }
+
+    .step-label { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); }
+    .sidebar-step.active .step-label  { color: var(--text); }
+    .sidebar-step.done   .step-label  { color: var(--accent); }
+
+    .sidebar-divider {
+      width: 2px; height: 20px;
+      background: var(--border);
+      margin-left: 27px;
+    }
+
+    /* Main content */
+    .onboarding-main {
+      padding: 60px 64px;
+      max-width: 720px;
+    }
+
+    .step-panel { display: none; }
+    .step-panel.active { display: block; animation: fadeUp 0.3s ease; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .step-heading {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .step-heading span { color: var(--accent); }
+
+    .step-sub {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      margin-bottom: 36px;
+      font-weight: 300;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--surface2);
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(0,212,170,0.04);
+    }
+    .upload-zone .upload-icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .upload-zone p { color: var(--text-dim); font-size: 0.9rem; }
+    .upload-zone strong { color: var(--accent); }
+    .upload-zone input[type="file"] { display: none; }
+
+    .upload-success {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px; border-radius: 10px;
+      background: rgba(0,212,170,0.08);
+      border: 1px solid rgba(0,212,170,0.2);
+      margin-top: 14px;
+    }
+    .upload-success .file-icon { font-size: 1.5rem; }
+    .upload-success .file-name { font-size: 0.9rem; font-weight: 500; }
+    .upload-success .file-size { font-size: 0.78rem; color: var(--text-muted); }
+
+    /* Step navigation */
+    .step-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .step-counter {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Preferences grid */
+    .pref-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .pref-chip {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      user-select: none;
+    }
+    .pref-chip:hover  { border-color: var(--accent2); }
+    .pref-chip.chosen { border-color: var(--accent); background: rgba(0,212,170,0.1); color: var(--accent); font-weight: 600; }
+
+    /* Summary card */
+    .summary-row {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.875rem;
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-key { color: var(--text-muted); width: 140px; flex-shrink: 0; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; padding-top: 2px; }
+    .summary-val { color: var(--text); line-height: 1.5; }
+
+    @media (max-width: 900px) {
+      .onboarding-shell { grid-template-columns: 1fr; }
+      .onboarding-sidebar { display: none; }
+      .onboarding-main { padding: 32px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="onboarding-shell">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="onboarding-sidebar">
+    <div class="sidebar-brand">⚡ CareerAgent</div>
+
+    <div class="sidebar-step active" id="nav-1">
+      <div class="step-dot" id="dot-1">1</div>
+      <div class="step-label">Personal Info</div>
+    </div>
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-step" id="nav-2">
+      <div class="step-dot" id="dot-2">2</div>
+      <div class="step-label">Education</div>
+    </div>
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-step" id="nav-3">
+      <div class="step-dot" id="dot-3">3</div>
+      <div class="step-label">Skills</div>
+    </div>
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-step" id="nav-4">
+      <div class="step-dot" id="dot-4">4</div>
+      <div class="step-label">Career Preferences</div>
+    </div>
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-step" id="nav-5">
+      <div class="step-dot" id="dot-5">5</div>
+      <div class="step-label">Upload CV</div>
+    </div>
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-step" id="nav-6">
+      <div class="step-dot" id="dot-6">6</div>
+      <div class="step-label">Review & Save</div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT ── -->
+  <main class="onboarding-main">
+
+    <!-- STEP 1: Personal Info -->
+    <div class="step-panel active" id="step-1">
+      <div class="step-heading">Welcome to <span>CareerAgent</span></div>
+      <p class="step-sub">Let's build your profile. This takes about 5 minutes and powers everything on the platform.</p>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label>First Name *</label>
+          <input type="text" id="firstName" placeholder="Akosua" />
+        </div>
+        <div class="form-group">
+          <label>Last Name *</label>
+          <input type="text" id="lastName" placeholder="Mensah" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Email Address *</label>
+        <input type="text" id="email" placeholder="akosua@example.com" />
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="text" id="phone" placeholder="+233 24 000 0000" />
+        </div>
+        <div class="form-group">
+          <label>Location (City)</label>
+          <input type="text" id="location" placeholder="Kumasi, Accra..." />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>LinkedIn Profile URL</label>
+        <input type="text" id="linkedin" placeholder="https://linkedin.com/in/yourname" />
+      </div>
+    </div>
+
+    <!-- STEP 2: Education -->
+    <div class="step-panel" id="step-2">
+      <div class="step-heading">Your <span>Education</span></div>
+      <p class="step-sub">Tell us about your academic background.</p>
+
+      <div class="form-group">
+        <label>Institution *</label>
+        <input type="text" id="institution" placeholder="e.g. KNUST, UG, GIMPA..." />
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Degree Level *</label>
+          <select id="degreeLevel">
+            <option value="">Select level</option>
+            <option value="HND">HND</option>
+            <option value="BSc">BSc</option>
+            <option value="BA">BA</option>
+            <option value="BEng">BEng</option>
+            <option value="MSc">MSc</option>
+            <option value="MBA">MBA</option>
+            <option value="PhD">PhD</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Field of Study *</label>
+          <input type="text" id="fieldOfStudy" placeholder="e.g. Computer Engineering" />
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Graduation Year</label>
+          <select id="graduationYear">
+            <option value="">Select year</option>
+            <option value="2026">2026 (current)</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+            <option value="2023">2023</option>
+            <option value="2022">2022</option>
+            <option value="2021">2021</option>
+            <option value="older">Before 2021</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Classification / GPA</label>
+          <select id="classification">
+            <option value="">Select (optional)</option>
+            <option value="First Class">First Class</option>
+            <option value="Second Class Upper">Second Class Upper</option>
+            <option value="Second Class Lower">Second Class Lower</option>
+            <option value="Third Class">Third Class</option>
+            <option value="Pass">Pass</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Certifications (optional)</label>
+        <div class="tag-input-wrapper" id="certsWrapper">
+          <input class="tag-input" id="certInput" type="text" placeholder="e.g. AWS Cloud Practitioner, Google Analytics..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: Skills -->
+    <div class="step-panel" id="step-3">
+      <div class="step-heading">Your <span>Skills</span></div>
+      <p class="step-sub">Add your technical skills, tools, and soft skills. Press Enter or comma to add each one.</p>
+
+      <div class="form-group">
+        <label>Technical Skills *</label>
+        <div class="tag-input-wrapper" id="techSkillsWrapper">
+          <input class="tag-input" id="techSkillInput" type="text" placeholder="e.g. Python, SQL, AutoCAD, Excel..." />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Soft Skills</label>
+        <div class="tag-input-wrapper" id="softSkillsWrapper">
+          <input class="tag-input" id="softSkillInput" type="text" placeholder="e.g. Leadership, Communication, Teamwork..." />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Languages Spoken</label>
+        <div class="tag-input-wrapper" id="languagesWrapper">
+          <input class="tag-input" id="langInput" type="text" placeholder="e.g. English, Twi, French..." />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Years of Work Experience</label>
+        <select id="yearsExp">
+          <option value="0">Fresh Graduate / No Experience</option>
+          <option value="1">Less than 1 year</option>
+          <option value="2">1–2 years</option>
+          <option value="3">3–5 years</option>
+          <option value="5">5+ years</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- STEP 4: Career Preferences -->
+    <div class="step-panel" id="step-4">
+      <div class="step-heading">Career <span>Preferences</span></div>
+      <p class="step-sub">Help us match you to the right opportunities.</p>
+
+      <div class="form-group">
+        <label>Industries of Interest * (select all that apply)</label>
+        <div class="pref-grid" id="industryGrid">
+          <div class="pref-chip" data-group="industries">Technology / IT</div>
+          <div class="pref-chip" data-group="industries">Finance & Banking</div>
+          <div class="pref-chip" data-group="industries">Healthcare</div>
+          <div class="pref-chip" data-group="industries">Telecoms</div>
+          <div class="pref-chip" data-group="industries">Energy & Mining</div>
+          <div class="pref-chip" data-group="industries">Education</div>
+          <div class="pref-chip" data-group="industries">Government</div>
+          <div class="pref-chip" data-group="industries">NGO / Development</div>
+          <div class="pref-chip" data-group="industries">Marketing & Media</div>
+          <div class="pref-chip" data-group="industries">Construction</div>
+          <div class="pref-chip" data-group="industries">Logistics</div>
+          <div class="pref-chip" data-group="industries">Agriculture</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Preferred Job Type</label>
+        <div class="pref-grid" id="jobTypeGrid">
+          <div class="pref-chip" data-group="jobTypes">Full-time</div>
+          <div class="pref-chip" data-group="jobTypes">Part-time</div>
+          <div class="pref-chip" data-group="jobTypes">Contract</div>
+          <div class="pref-chip" data-group="jobTypes">Internship</option>
+          <div class="pref-chip" data-group="jobTypes">Remote</div>
+          <div class="pref-chip" data-group="jobTypes">Hybrid</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Preferred Work Location</label>
+          <input type="text" id="workLocation" placeholder="e.g. Accra, Kumasi, Remote..." />
+        </div>
+        <div class="form-group">
+          <label>Expected Salary (GHS / month)</label>
+          <select id="salaryRange">
+            <option value="">Prefer not to say</option>
+            <option value="0-2000">Below GHS 2,000</option>
+            <option value="2000-4000">GHS 2,000 – 4,000</option>
+            <option value="4000-7000">GHS 4,000 – 7,000</option>
+            <option value="7000-12000">GHS 7,000 – 12,000</option>
+            <option value="12000+">Above GHS 12,000</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Career Goal (short description)</label>
+        <textarea id="careerGoal" placeholder="e.g. I want to become a data engineer at a fintech company within 2 years..."></textarea>
+      </div>
+    </div>
+
+    <!-- STEP 5: Upload CV -->
+    <div class="step-panel" id="step-5">
+      <div class="step-heading">Upload Your <span>CV</span></div>
+      <p class="step-sub">Optional but recommended. We'll parse it to pre-fill any gaps in your profile and use it as your base CV for tailoring.</p>
+
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="cvFile" accept=".pdf,.docx" />
+        <div class="upload-icon">📄</div>
+        <p><strong>Click to upload</strong> or drag & drop your CV here</p>
+        <p style="margin-top:6px;font-size:0.8rem;">PDF or DOCX · Max 5MB</p>
+      </div>
+
+      <div id="uploadSuccess" style="display:none;" class="upload-success">
+        <div class="file-icon">✅</div>
+        <div>
+          <div class="file-name" id="uploadedFileName"></div>
+          <div class="file-size" id="uploadedFileSize"></div>
+        </div>
+        <button class="btn btn-secondary" style="margin-left:auto;padding:6px 14px;font-size:0.8rem;" onclick="clearUpload()">Remove</button>
+      </div>
+
+      <div class="alert alert-info" style="margin-top:20px;">
+        💡 If you skip this, you can upload your CV later from the Resume Tailor page.
+      </div>
+    </div>
+
+    <!-- STEP 6: Review -->
+    <div class="step-panel" id="step-6">
+      <div class="step-heading">Review & <span>Save</span></div>
+      <p class="step-sub">Everything look good? You can always edit your profile later.</p>
+
+      <div class="card" id="reviewCard" style="margin-bottom:16px;"></div>
+
+      <div id="saveError" class="alert alert-error" style="display:none;"></div>
+      <div id="saveSuccess" class="alert alert-success" style="display:none;">
+        ✅ Profile saved! Redirecting to your dashboard...
+      </div>
+    </div>
+
+    <!-- NAVIGATION BUTTONS -->
+    <div class="step-nav">
+      <span class="step-counter" id="stepCounter">Step 1 of 6</span>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" id="prevBtn" onclick="prevStep()" style="display:none;">← Back</button>
+        <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">Continue →</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="../js/onboarding.js"></script>
+</body>
+</html>

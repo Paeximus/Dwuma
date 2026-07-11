@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skills Gap Analysis — Career Agent</title>
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">⚡ CareerAgent</div>
+  <div class="nav-links">
+    <a href="dashboard.html"><span>Dashboard</span></a>
+    <a href="profile.html"><span>Profile</span></a>
+    <a href="skills-gap.html" class="active"><span>Skills Gap</span></a>
+    <a href="resume-tailor.html"><span>Resume</span></a>
+    <a href="job-hunter.html"><span>Jobs</span></a>
+    <a href="interview.html"><span>Interview</span></a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <div class="page-header">
+    <h1>Skills <span>Gap Analysis</span></h1>
+    <p>Enter your current skills and a target role — the AI will identify what you're missing and how to close the gap.</p>
+  </div>
+
+  <!-- INPUT PANEL -->
+  <div id="inputPanel">
+    <div class="grid-2">
+      <!-- Left: Your Skills -->
+      <div class="card">
+        <div class="card-title">
+          <div class="icon icon-green">🧠</div>
+          Your Current Skills
+        </div>
+
+        <div class="form-group">
+          <label>Add skills (press Enter or comma to add)</label>
+          <div class="tag-input-wrapper" id="skillsWrapper">
+            <input
+              class="tag-input"
+              id="skillInput"
+              type="text"
+              placeholder="e.g. Python, Excel, SQL..."
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Education Level</label>
+          <select id="education">
+            <option value="">Select level</option>
+            <option value="HND">HND</option>
+            <option value="BSc">BSc</option>
+            <option value="MSc">MSc</option>
+            <option value="PhD">PhD</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Field of Study</label>
+          <input type="text" id="fieldOfStudy" placeholder="e.g. Computer Engineering" />
+        </div>
+
+        <div class="form-group">
+          <label>Years of Experience</label>
+          <select id="experience">
+            <option value="0">Fresh Graduate / No Experience</option>
+            <option value="1">Less than 1 year</option>
+            <option value="2">1–2 years</option>
+            <option value="3">3–5 years</option>
+            <option value="5">5+ years</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Right: Target Role -->
+      <div class="card">
+        <div class="card-title">
+          <div class="icon icon-blue">🎯</div>
+          Target Role
+        </div>
+
+        <div class="form-group">
+          <label>Job Title</label>
+          <input type="text" id="jobTitle" placeholder="e.g. Software Engineer, Data Analyst..." />
+        </div>
+
+        <div class="form-group">
+          <label>Industry</label>
+          <select id="industry">
+            <option value="">Select industry</option>
+            <option value="Technology">Technology / IT</option>
+            <option value="Finance">Finance & Banking</option>
+            <option value="Healthcare">Healthcare</option>
+            <option value="Telecommunications">Telecommunications</option>
+            <option value="Energy">Energy & Mining</option>
+            <option value="Education">Education</option>
+            <option value="Government">Government & Public Sector</option>
+            <option value="NGO">NGO / Development</option>
+            <option value="Marketing">Marketing & Media</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Job Description (optional but recommended)</label>
+          <textarea
+            id="jobDescription"
+            placeholder="Paste the full job description here for a more accurate gap analysis..."
+          ></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div id="formError" class="alert alert-error" style="display:none;"></div>
+
+    <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
+      <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+      <button class="btn btn-primary" id="analyzeBtn" onclick="runAnalysis()">
+        ⚡ Analyse My Skills Gap
+      </button>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loadingPanel" style="display:none;">
+    <div class="card">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p id="loadingText">Analysing your skills profile...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="resultsPanel" style="display:none;">
+
+    <!-- Summary Stats -->
+    <div class="grid-3" style="margin-bottom:20px;" id="statsRow"></div>
+
+    <!-- Overall Match -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">
+        <div class="icon icon-blue">📊</div>
+        Overall Readiness for <span id="roleNameDisplay" style="color:var(--accent);margin-left:4px;"></span>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:0.85rem;color:var(--text-dim);">Skills Match</span>
+            <span id="matchPct" style="font-weight:700;color:var(--accent);"></span>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="matchBar" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+      <p id="overallSummary" style="margin-top:14px;font-size:0.9rem;color:var(--text-dim);line-height:1.7;"></p>
+    </div>
+
+    <div class="grid-2">
+      <!-- Skill Items -->
+      <div class="card">
+        <div class="card-title">
+          <div class="icon icon-green">🔍</div>
+          Skill Breakdown
+        </div>
+        <div id="skillBreakdown"></div>
+      </div>
+
+      <!-- Learning Resources -->
+      <div>
+        <div class="card" style="margin-bottom:0;">
+          <div class="card-title">
+            <div class="icon icon-warn">📚</div>
+            Recommended Resources
+          </div>
+          <div id="resourceList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="resetAnalysis()">← New Analysis</button>
+      <button class="btn btn-primary" onclick="saveReport()">💾 Save Report</button>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="/js/skills-gap.js"></script>
+</body>
+</html>

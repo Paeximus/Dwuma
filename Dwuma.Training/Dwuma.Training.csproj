@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<Content Include="Data\user_job_interactions.csv">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
+  <ItemGroup>
+	  <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+	  <PackageReference Include="Microsoft.Extensions.ML" Version="5.0.0" />
+	  <PackageReference Include="Microsoft.ML" Version="5.0.0" />
+	  <PackageReference Include="Microsoft.ML.FastTree" Version="5.0.0" />
+	  <PackageReference Include="Microsoft.ML.LightGbm" Version="5.0.0" />
+	  <PackageReference Include="Microsoft.ML.Recommender" Version="0.23.0" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<None Update="Data\user_job_interactions.csv">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Models\" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Profile — Career Agent</title>
+  <link rel="stylesheet" href="../css/main.css" />
+  <style>
+    .profile-header {
+      display: flex; align-items: center; gap: 24px;
+      margin-bottom: 36px;
+    }
+    .avatar {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-display);
+      font-size: 1.6rem; font-weight: 800; color: #0a0e1a;
+      flex-shrink: 0;
+    }
+    .profile-name {
+      font-family: var(--font-display);
+      font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px;
+    }
+    .profile-role { color: var(--text-dim); font-size: 0.9rem; margin-top: 4px; }
+
+    .section-heading {
+      font-family: var(--font-display);
+      font-size: 0.75rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--accent); margin-bottom: 16px;
+    }
+
+    .profile-field {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.875rem;
+    }
+    .profile-field:last-child { border-bottom: none; }
+    .field-key { color: var(--text-muted); width: 160px; flex-shrink: 0; }
+    .field-val { color: var(--text); text-align: right; }
+
+    .skill-pill {
+      display: inline-block;
+      padding: 3px 10px; border-radius: 6px;
+      font-size: 0.78rem; font-weight: 500; margin: 3px;
+    }
+    .pill-tech { background: rgba(79,142,255,0.12); color: var(--accent2); border: 1px solid rgba(79,142,255,0.2); }
+    .pill-soft { background: rgba(0,212,170,0.1); color: var(--accent); border: 1px solid rgba(0,212,170,0.2); }
+    .pill-lang { background: rgba(245,158,11,0.1); color: var(--warn); border: 1px solid rgba(245,158,11,0.2); }
+
+    .completion-bar-wrap { height: 8px; background: var(--surface2); border-radius: 4px; margin-top: 8px; }
+    .completion-bar-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 1s ease;
+    }
+    .completion-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-dim); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">⚡ CareerAgent</div>
+  <div class="nav-links">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="profile.html" class="active">Profile</a>
+    <a href="skills-gap.html">Skills Gap</a>
+    <a href="resume-tailor.html">Resume</a>
+    <a href="job-hunter.html">Jobs</a>
+    <a href="interview.html">Interview</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="profile-header">
+    <div class="avatar" id="avatarInitials">?</div>
+    <div>
+      <div class="profile-name" id="profileFullName">Loading...</div>
+      <div class="profile-role" id="profileSubtitle"></div>
+    </div>
+    <div style="margin-left:auto; display:flex; gap:10px;">
+      <a href="onboarding.html" class="btn btn-secondary">✏️ Edit Profile</a>
+    </div>
+  </div>
+
+  <!-- Profile Completion -->
+  <div class="card" style="margin-bottom:24px;">
+    <div class="card-title"><div class="icon icon-green">📊</div> Profile Completion</div>
+    <div class="completion-label">
+      <span>Keep your profile updated for better results</span>
+      <span id="completionPct">0%</span>
+    </div>
+    <div class="completion-bar-wrap">
+      <div class="completion-bar-fill" id="completionBar" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- Personal & Education -->
+    <div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="section-heading">Personal Info</div>
+        <div id="personalFields"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-heading">Education</div>
+        <div id="educationFields"></div>
+      </div>
+    </div>
+
+    <!-- Skills & Preferences -->
+    <div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="section-heading">Skills</div>
+        <div style="margin-bottom:10px;">
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Technical</div>
+          <div id="techSkillPills"></div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Soft Skills</div>
+          <div id="softSkillPills"></div>
+        </div>
+        <div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Languages</div>
+          <div id="langPills"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-heading">Career Preferences</div>
+        <div id="preferenceFields"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../js/profile.js"></script>
+</body>
+</html>
