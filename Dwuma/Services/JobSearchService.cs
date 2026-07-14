@@ -20,68 +20,139 @@ public sealed class JobSearchService
         _logger = logger;
     }
 
-    public async Task<JobSearchResponse> SearchAsync(
-        string? query,
-        int page = 1,
-        bool? remoteOnly = null,
-        CancellationToken cancellationToken = default)
+     public async Task<JobSearchResponse> SearchAsync(
+     string? query,
+     string? location,
+     int page = 1,
+     bool? remoteOnly = null,
+     bool englishOnly = false,
+     CancellationToken cancellationToken = default)
     {
         page = Math.Max(page, 1);
 
-        string requestUrl =
-            $"{BaseUrl}?page={page}";
+        const int pagesToSearch = 5;
+        const int maximumResults = 30;
 
-        using HttpResponseMessage response =
-            await _httpClient.GetAsync(
-                requestUrl,
-                cancellationToken);
+        var jobs = new List<ExternalJobListing>();
 
-        if (!response.IsSuccessStatusCode)
+        for (
+            int currentPage = page;
+            currentPage < page + pagesToSearch;
+            currentPage++)
         {
-            string errorBody =
-                await response.Content.ReadAsStringAsync(
-                    cancellationToken);
+            string requestUrl =
+                $"{BaseUrl}?page={currentPage}";
 
-            _logger.LogError(
-                "Arbeitnow failed with status {StatusCode}. Body: {Body}",
-                response.StatusCode,
-                errorBody);
+            try
+            {
+                using HttpResponseMessage response =
+                    await _httpClient.GetAsync(
+                        requestUrl,
+                        cancellationToken);
 
-            throw new InvalidOperationException(
-                $"Job provider returned status {(int)response.StatusCode}.");
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorBody =
+                        await response.Content.ReadAsStringAsync(
+                            cancellationToken);
+
+                    _logger.LogWarning(
+                        "Arbeitnow page {Page} returned status {StatusCode}. Body: {Body}",
+                        currentPage,
+                        response.StatusCode,
+                        errorBody);
+
+                    continue;
+                }
+
+                ArbeitnowResponse? providerResponse =
+                    await response.Content
+                        .ReadFromJsonAsync<ArbeitnowResponse>(
+                            cancellationToken:
+                                cancellationToken);
+
+                if (providerResponse?.Data is null ||
+                    providerResponse.Data.Count == 0)
+                {
+                    continue;
+                }
+
+                jobs.AddRange(
+                    providerResponse.Data.Select(MapJob));
+            }
+            catch (OperationCanceledException)
+                when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    "The request for Arbeitnow page {Page} timed out.",
+                    currentPage);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "The request for Arbeitnow page {Page} failed.",
+                    currentPage);
+            }
         }
 
-        ArbeitnowResponse? providerResponse =
-            await response.Content
-                .ReadFromJsonAsync<ArbeitnowResponse>(
-                    cancellationToken: cancellationToken);
-
-        List<ExternalJobListing> jobs =
-            providerResponse?.Data
-                .Select(MapJob)
-                .ToList()
-            ?? [];
+        if (jobs.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "The job provider returned no available jobs.");
+        }
 
         if (!string.IsNullOrWhiteSpace(query))
         {
-            string searchText =
-                query.Trim();
+            string[] searchTerms =
+                query.Split(
+                    ' ',
+                    StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries);
+
+            jobs = jobs
+                .Where(job =>
+                    searchTerms.Any(term =>
+                        ContainsIgnoreCase(
+                            job.Title,
+                            term) ||
+                        ContainsIgnoreCase(
+                            job.CompanyName,
+                            term) ||
+                        ContainsIgnoreCase(
+                            job.Description,
+                            term) ||
+                        ContainsIgnoreCase(
+                            job.Location,
+                            term) ||
+                        job.Tags.Any(tag =>
+                            ContainsIgnoreCase(
+                                tag,
+                                term)) ||
+                        job.JobTypes.Any(jobType =>
+                            ContainsIgnoreCase(
+                                jobType,
+                                term))))
+                .ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(location))
+        {
+            string locationSearch =
+                location.Trim();
 
             jobs = jobs
                 .Where(job =>
                     ContainsIgnoreCase(
-                        job.Title,
-                        searchText) ||
-                    ContainsIgnoreCase(
-                        job.CompanyName,
-                        searchText) ||
-                    ContainsIgnoreCase(
-                        job.Description,
-                        searchText) ||
-                    job.Tags.Any(tag =>
-                        ContainsIgnoreCase(
-                            tag,
-                            searchText)))
+                        job.Location,
+                        locationSearch))
+                .ToList();
+        }
+
+        if (englishOnly)
+        {
+            jobs = jobs
+                .Where(IsProbablyEnglish)
                 .ToList();
         }
 
@@ -91,6 +162,16 @@ public sealed class JobSearchService
                 .Where(job => job.Remote)
                 .ToList();
         }
+
+        jobs = jobs
+            .GroupBy(job =>
+                !string.IsNullOrWhiteSpace(job.Slug)
+                    ? job.Slug
+                    : job.Url)
+            .Select(group => group.First())
+            .OrderByDescending(job => job.CreatedAt)
+            .Take(maximumResults)
+            .ToList();
 
         return new JobSearchResponse
         {
@@ -155,5 +236,72 @@ public sealed class JobSearchService
             .Replace("\r", " ")
             .Replace("\n", " ")
             .Trim();
+    }
+
+    private static bool IsProbablyEnglish(
+    ExternalJobListing job)
+    {
+        string combinedText =
+            $"{job.Title} {job.Description}"
+                .ToLowerInvariant();
+
+        combinedText = combinedText
+            .Replace(
+                "find more english speaking jobs in germany on arbeitnow",
+                string.Empty)
+            .Replace(
+                "find english speaking jobs in germany on arbeitnow",
+                string.Empty)
+            .Replace(
+                "find jobs in germany on arbeitnow",
+                string.Empty);
+
+        string[] strongGermanIndicators =
+        [
+            " aufgaben ",
+        " qualifikation ",
+        " deine aufgaben ",
+        " das bringst du mit ",
+        " wir suchen ",
+        " wir bieten ",
+        " was dich erwartet ",
+        " berufserfahrung ",
+        " deutschkenntnisse ",
+        " bewerbung ",
+        " ausbildung ",
+        " vollzeit ",
+        " teilzeit ",
+        " kenntnisse ",
+        " verantwortung ",
+        " unser team ",
+        " wir freuen uns "
+        ];
+
+        string[] strongEnglishIndicators =
+        [
+            " responsibilities ",
+        " requirements ",
+        " qualifications ",
+        " about the role ",
+        " about you ",
+        " your responsibilities ",
+        " what you will do ",
+        " what we offer ",
+        " we are looking for ",
+        " you will ",
+        " join our team ",
+        " apply now "
+        ];
+
+        int germanScore =
+            strongGermanIndicators.Count(indicator =>
+                combinedText.Contains(indicator));
+
+        int englishScore =
+            strongEnglishIndicators.Count(indicator =>
+                combinedText.Contains(indicator));
+
+        return englishScore >= 2 &&
+               germanScore == 0;
     }
 }

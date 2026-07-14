@@ -173,4 +173,135 @@ public sealed class GeminiService
                 ex);
         }
     }
+
+    public async Task<string> TranscribeAudioAsync(
+    byte[] audioBytes,
+    string mimeType,
+    CancellationToken cancellationToken = default)
+    {
+        if (audioBytes is null || audioBytes.Length == 0)
+        {
+            throw new ArgumentException(
+                "Audio data cannot be empty.",
+                nameof(audioBytes));
+        }
+
+        if (string.IsNullOrWhiteSpace(mimeType))
+        {
+            mimeType = "audio/webm";
+        }
+
+        string base64Audio =
+            Convert.ToBase64String(audioBytes);
+
+        var requestBody = new
+        {
+            contents = new[]
+            {
+            new
+            {
+                role = "user",
+                parts = new object[]
+                {
+                    new
+                    {
+                        text =
+                            "Transcribe this interview answer accurately. " +
+                            "Return only the spoken words as plain text. " +
+                            "Do not add commentary or markdown."
+                    },
+                    new
+                    {
+                        inlineData = new
+                        {
+                            mimeType,
+                            data = base64Audio
+                        }
+                    }
+                }
+            }
+        },
+            generationConfig = new
+            {
+                temperature = 0.0,
+                maxOutputTokens = 2000
+            }
+        };
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent");
+
+        request.Headers.Add(
+            "x-goog-api-key",
+            _apiKey);
+
+        request.Content =
+            JsonContent.Create(requestBody);
+
+        using HttpResponseMessage response =
+            await _httpClient.SendAsync(
+                request,
+                cancellationToken);
+
+        string responseBody =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError(
+                "Gemini transcription failed with status {StatusCode}. Body: {Body}",
+                response.StatusCode,
+                responseBody);
+
+            throw new InvalidOperationException(
+                $"Gemini transcription failed with status {(int)response.StatusCode}.");
+        }
+
+        try
+        {
+            using JsonDocument document =
+                JsonDocument.Parse(responseBody);
+
+            JsonElement candidates =
+                document.RootElement.GetProperty(
+                    "candidates");
+
+            if (candidates.GetArrayLength() == 0)
+            {
+                throw new InvalidOperationException(
+                    "Gemini returned no transcription.");
+            }
+
+            string? transcription =
+                candidates[0]
+                    .GetProperty("content")
+                    .GetProperty("parts")[0]
+                    .GetProperty("text")
+                    .GetString();
+
+            if (string.IsNullOrWhiteSpace(transcription))
+            {
+                throw new InvalidOperationException(
+                    "Gemini returned an empty transcription.");
+            }
+
+            return transcription.Trim();
+        }
+        catch (Exception ex) when (
+            ex is JsonException ||
+            ex is KeyNotFoundException ||
+            ex is InvalidOperationException)
+        {
+            _logger.LogError(
+                ex,
+                "Could not parse transcription response: {Body}",
+                responseBody);
+
+            throw new InvalidOperationException(
+                "Gemini returned an unexpected transcription response.",
+                ex);
+        }
+    }
 }

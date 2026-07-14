@@ -1,6 +1,8 @@
 ﻿using System.Text;
 using System.Text.Json;
 using Dwuma.Models.Interview;
+using Microsoft.AspNetCore.Http;
+using System.IO;
 
 namespace Dwuma.Services;
 
@@ -435,6 +437,107 @@ public sealed class InterviewCoachService
                 "improvedAnswer",
                 "deliveryTip"
             }
+        };
+    }
+
+    public async Task<VoiceInterviewResponse> EvaluateVoiceAnswerAsync(
+    string jobTitle,
+    string companyName,
+    string jobDescription,
+    string question,
+    IFormFile audioFile,
+    CancellationToken cancellationToken = default)
+    {
+        if (audioFile is null || audioFile.Length == 0)
+        {
+            throw new ArgumentException(
+                "An audio file is required.");
+        }
+
+        const long maximumAudioSize =
+            10 * 1024 * 1024;
+
+        if (audioFile.Length > maximumAudioSize)
+        {
+            throw new ArgumentException(
+                "The audio file must be 10 MB or smaller.");
+        }
+
+        string contentType =
+            string.IsNullOrWhiteSpace(
+                audioFile.ContentType)
+                ? "audio/webm"
+                : audioFile.ContentType;
+
+        string extension =
+        Path.GetExtension(audioFile.FileName)
+        .ToLowerInvariant();
+
+        if (extension == ".m4a" &&
+            string.Equals(
+                contentType,
+                "application/octet-stream",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            contentType = "audio/mp4";
+        }
+
+        string[] allowedContentTypes =
+        [
+            "audio/webm",
+            "audio/wav",
+            "audio/x-wav",
+            "audio/mpeg",
+            "audio/mp3",
+            "audio/mp4",
+            "audio/m4a",
+            "audio/aac",
+            "audio/ogg",
+            "audio/flac",
+            "audio/aiff",
+            "application/octet-stream"
+        ];
+
+        if (!allowedContentTypes.Contains(
+            contentType,
+            StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                $"Unsupported audio format: {contentType}");
+        }
+
+        await using var memoryStream =
+            new MemoryStream();
+
+        await audioFile.CopyToAsync(
+            memoryStream,
+            cancellationToken);
+
+        string transcription =
+            await _geminiService.TranscribeAudioAsync(
+                memoryStream.ToArray(),
+                contentType,
+                cancellationToken);
+
+        var evaluationRequest =
+            new InterviewAnswerRequest
+            {
+                JobTitle = jobTitle,
+                CompanyName = companyName,
+                JobDescription = jobDescription,
+                Question = question,
+                CandidateAnswer = transcription
+            };
+
+        InterviewFeedbackResponse feedback =
+            await EvaluateAnswerAsync(
+                evaluationRequest,
+                cancellationToken);
+
+        return new VoiceInterviewResponse
+        {
+            Transcription = transcription,
+            Feedback = feedback
         };
     }
 }

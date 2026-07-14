@@ -20,22 +20,23 @@ public sealed class JobsController : ControllerBase
     }
 
     [HttpGet("search")]
-    [ProducesResponseType(
-        typeof(JobSearchResponse),
-        StatusCodes.Status200OK)]
     public async Task<IActionResult> Search(
-        [FromQuery] string? query,
-        [FromQuery] int page = 1,
-        [FromQuery] bool? remoteOnly = null,
-        CancellationToken cancellationToken = default)
+    [FromQuery] string? query,
+    [FromQuery] string? location,
+    [FromQuery] int page = 1,
+    [FromQuery] bool? remoteOnly = null,
+    [FromQuery] bool englishOnly = false,
+    CancellationToken cancellationToken = default)
     {
         try
         {
             JobSearchResponse result =
                 await _jobSearchService.SearchAsync(
                     query,
+                    location,
                     page,
                     remoteOnly,
+                    englishOnly,
                     cancellationToken);
 
             return Ok(result);

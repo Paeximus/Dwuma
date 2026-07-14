@@ -53,6 +53,8 @@ builder.Services.AddScoped<SkillsGapService>();
 builder.Services.AddScoped<ResumeTailorService>();
 builder.Services.AddScoped<InteractionRatingService>();
 builder.Services.AddScoped<JobInteractionService>();
+builder.Services.AddScoped<InterviewCoachService>();
+builder.Services.AddScoped<JobMatchService>();
 
 builder.Services.AddCors(options =>
 {
@@ -69,6 +71,14 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
+
+builder.Services.Configure<
+    Microsoft.AspNetCore.Http.Features.FormOptions>(
+    options =>
+    {
+        options.MultipartBodyLengthLimit =
+            10 * 1024 * 1024;
+    });
 
 var app = builder.Build();
 
