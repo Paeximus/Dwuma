@@ -26,7 +26,7 @@ public sealed class JobsController : ControllerBase
     [FromQuery] int page = 1,
     [FromQuery] bool? remoteOnly = null,
     [FromQuery] bool englishOnly = false,
-    CancellationToken cancellationToken = default)
+    CancellationToken cancellationToken = default) 
     {
         try
         {
