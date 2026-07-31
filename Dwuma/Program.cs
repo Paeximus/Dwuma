@@ -1,13 +1,11 @@
 using Dwuma.Infrastructure;
 using Dwuma.Models.Data.DwumaContext;
-using Dwuma.Models.Data.DwumaContext;
 using Dwuma.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Reflection;
 using System.Text;
 using System.Threading.RateLimiting;
 
@@ -66,14 +64,17 @@ string connectionString =
 builder.Services.AddDbContext<DwumaContext>(options =>
     options.UseSqlServer(connectionString));
 
-builder.Services.AddHttpClient<GeminiService>(
-    client =>
-    {
-        client.Timeout =
-            TimeSpan.FromMinutes(3);
-    }); builder.Services.AddHttpClient<JobSearchService>();
-builder.Services.AddHttpClient<ProfileService>();
+builder.Services.AddHttpClient<GeminiService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
 
+builder.Services.AddHttpClient<JobSearchService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+
+builder.Services.AddHttpClient<ProfileService>();
 builder.Services.AddScoped<SkillsGapService>();
 builder.Services.AddScoped<ResumeTailorService>();
 builder.Services.AddScoped<InteractionRatingService>();
@@ -199,6 +200,25 @@ builder.Services.AddRateLimiter(options =>
             limiterOptions.AutoReplenishment = true;
         });
 });
+
+
+builder.Services.AddHttpClient<JoobleJobService>(
+    client =>
+    {
+        client.Timeout =
+            TimeSpan.FromSeconds(30);
+
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+            "Dwuma/1.0");
+    });
+
+builder.Services.AddHttpClient<CareerjetJobService>(
+    client =>
+    {
+        client.Timeout =
+            TimeSpan.FromSeconds(30);
+    });
+
 
 var app = builder.Build();
 

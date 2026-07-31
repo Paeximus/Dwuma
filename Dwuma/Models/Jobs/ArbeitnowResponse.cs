@@ -1,4 +1,6 @@
 ﻿using System.Text.Json.Serialization;
+using Dwuma.Converters;
+using System.Text.Json.Serialization;
 
 namespace Dwuma.Models.Jobs;
 
@@ -35,10 +37,12 @@ public sealed class ArbeitnowJob
     public string Url { get; set; } = string.Empty;
 
     [JsonPropertyName("tags")]
-    public List<string> Tags { get; set; } = [];
+    [JsonConverter(typeof(FlexibleStringListConverter))]
+    public List<string> Tags { get; set; } = new();
 
     [JsonPropertyName("job_types")]
-    public List<string> JobTypes { get; set; } = [];
+    [JsonConverter(typeof(FlexibleStringListConverter))]
+    public List<string> JobTypes { get; set; } = new();
 
     [JsonPropertyName("location")]
     public string Location { get; set; } = string.Empty;
