@@ -1,10 +1,12 @@
 ﻿using Dwuma.Models.Data.DwumaContext;
 using Dwuma.Services;
 using Microsoft.AspNetCore.Mvc;
-
+using Dwuma.Extensions;
+using Microsoft.AspNetCore.Authorization;
 namespace Dwuma.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/job-interactions")]
 public sealed class JobInteractionsController : ControllerBase
 {
@@ -18,47 +20,58 @@ public sealed class JobInteractionsController : ControllerBase
 
     [HttpPost("{jobId:int}/click")]
     public async Task<IActionResult> Click(
-        int jobId,
-        [FromQuery] int userId,
-        CancellationToken cancellationToken)
+    int jobId,
+    CancellationToken cancellationToken)
     {
+        int userId = User.GetUserId();
+
         await _interactionService.RecordClickAsync(
             userId,
             jobId,
             cancellationToken);
 
-        return Ok(new { message = "Click recorded." });
+        return Ok(new
+        {
+            message = "Job click recorded."
+        });
     }
 
     [HttpPost("{jobId:int}/save")]
     public async Task<IActionResult> Save(
-        int jobId,
-        [FromQuery] int userId,
-        CancellationToken cancellationToken)
+    int jobId,
+    CancellationToken cancellationToken)
     {
+        int userId = User.GetUserId();
+
         await _interactionService.RecordSaveAsync(
             userId,
             jobId,
             cancellationToken);
 
-        return Ok(new { message = "Save recorded." });
+        return Ok(new
+        {
+            message = "Job saved."
+        });
     }
-
     [HttpPost("{jobId:int}/dismiss")]
     public async Task<IActionResult> Dismiss(
-        int jobId,
-        [FromQuery] int userId,
-        CancellationToken cancellationToken)
+    int jobId,
+    CancellationToken cancellationToken)
     {
+        int userId = User.GetUserId();
+
         await _interactionService.RecordDismissAsync(
             userId,
             jobId,
             cancellationToken);
 
-        return Ok(new { message = "Dismiss recorded." });
+        return Ok(new
+        {
+            message = "Job dismissed."
+        });
     }
 
-    
+
 
 }
 

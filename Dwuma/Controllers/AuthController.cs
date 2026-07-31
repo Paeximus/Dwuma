@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Dwuma.Extensions;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Dwuma.Controllers;
 
@@ -22,6 +23,8 @@ public sealed class AuthController : ControllerBase
         _logger = logger;
     }
 
+
+    [EnableRateLimiting("auth-policy")]
     [AllowAnonymous]
     [HttpPost("register")]
     [ProducesResponseType(
@@ -58,22 +61,11 @@ public sealed class AuthController : ControllerBase
                 message = ex.Message
             });
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Registration failed for {Email}.",
-                request.Email);
-
-            return StatusCode(
-                StatusCodes.Status500InternalServerError,
-                new
-                {
-                    message = ex.Message
-                });
-        }
     }
 
+
+
+    [EnableRateLimiting("auth-policy")]
     [AllowAnonymous]
     [HttpPost("login")]
     [ProducesResponseType(

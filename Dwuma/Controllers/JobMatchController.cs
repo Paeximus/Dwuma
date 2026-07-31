@@ -1,10 +1,14 @@
 ﻿using Dwuma.Models.JobMatching;
 using Dwuma.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Dwuma.Controllers;
 
 [ApiController]
+[Authorize]
+[EnableRateLimiting("ai-policy")]
 [Route("api/job-match")]
 public sealed class JobMatchController : ControllerBase
 {

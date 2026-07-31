@@ -33,180 +33,357 @@ namespace Dwuma.Services
 
         // ─── SAVE PROFILE ─────────────────────────────────────────────────────
 
-        public async Task<ProfileResponse> SaveProfileAsync(ProfileRequest req)
+        public async Task<ProfileResponse> SaveProfileAsync(
+    int userId,
+    ProfileRequest request,
+    CancellationToken cancellationToken = default)
         {
-            // 1. Find or create the User row
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
+            User user =
+                await _db.Users
+                    .FirstOrDefaultAsync(
+                        existingUser =>
+                            existingUser.Id == userId,
+                        cancellationToken)
+                ?? throw new InvalidOperationException(
+                    "Authenticated user was not found.");
 
-            if (user == null)
+            user.FullName =
+                $"{request.FirstName} {request.LastName}".Trim();
+
+            user.UpdatedAt = DateTime.UtcNow;
+
+            Profile? profile =
+                await _db.Profiles
+                    .FirstOrDefaultAsync(
+                        existingProfile =>
+                            existingProfile.UserId == userId,
+                        cancellationToken);
+
+            if (profile is null)
             {
-                user = new User
+                profile = new Profile
                 {
-                    FullName     = $"{req.FirstName} {req.LastName}",
-                    Email        = req.Email,
-                    PasswordHash = string.Empty, // set properly when auth is added
-                    CreatedAt    = DateTime.UtcNow,
-                    UpdatedAt    = DateTime.UtcNow,
+                    UserId = userId
                 };
-                _db.Users.Add(user);
-                await _db.SaveChangesAsync(); // generates user.Id
-            }
-            else
-            {
-                user.FullName  = $"{req.FirstName} {req.LastName}";
-                user.UpdatedAt = DateTime.UtcNow;
-            }
 
-            // 2. Find or create the Profile row (1-to-1 with User)
-            var profile = await _db.Profiles.FirstOrDefaultAsync(p => p.UserId == user.Id);
-
-            if (profile == null)
-            {
-                profile = new Profile { UserId = user.Id };
                 _db.Profiles.Add(profile);
             }
 
-            MapRequestToProfile(req, profile);
-            profile.UpdatedAt = DateTime.UtcNow;
+            MapRequestToProfile(
+                request,
+                profile);
 
-            // 3. Sync skills into SKILLS table
-            await SyncSkillsAsync(user.Id, req);
+            profile.UpdatedAt =
+                DateTime.UtcNow;
 
-            await _db.SaveChangesAsync();
+            await SyncSkillsAsync(
+                userId,
+                request,
+                cancellationToken);
+
+            await _db.SaveChangesAsync(
+                cancellationToken);
 
             return new ProfileResponse
             {
-                UserId    = user.Id,
-                Message   = "Profile saved.",
-                FirstName = req.FirstName,
-                LastName  = req.LastName,
-                Email     = req.Email,
+                UserId = user.Id,
+                Message = "Profile saved.",
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = user.Email
             };
         }
 
         // ─── GET PROFILE ──────────────────────────────────────────────────────
 
-        public async Task<ProfileRequest?> GetProfileAsync(int userId)
+        public async Task<ProfileRequest?> GetProfileAsync(
+    int userId,
+    CancellationToken cancellationToken = default)
         {
-            var user = await _db.Users
-                .Include(u => u.Profile)
-                .Include(u => u.Skills)
-                .FirstOrDefaultAsync(u => u.Id == userId);
+            User? user =
+                await _db.Users
+                    .AsNoTracking()
+                    .Include(existingUser =>
+                        existingUser.Profile)
+                    .Include(existingUser =>
+                        existingUser.Skills)
+                    .FirstOrDefaultAsync(
+                        existingUser =>
+                            existingUser.Id == userId,
+                        cancellationToken);
 
-            if (user == null) return null;
+            if (user is null)
+            {
+                return null;
+            }
 
-            var nameParts = (user.FullName ?? "").Split(' ', 2);
+            string[] nameParts =
+                (user.FullName ?? string.Empty)
+                    .Split(
+                        ' ',
+                        2,
+                        StringSplitOptions.RemoveEmptyEntries);
 
             return new ProfileRequest
             {
-                FirstName      = nameParts.ElementAtOrDefault(0) ?? "",
-                LastName       = nameParts.ElementAtOrDefault(1) ?? "",
-                Email          = user.Email,
-                Institution    = user.Profile?.Institution,
-                DegreeLevel    = user.Profile?.Degree,
-                FieldOfStudy   = user.Profile?.FieldOfStudy,
-                GraduationYear = user.Profile?.GraduationYear?.ToString(),
-                Classification = user.Profile?.GpaClassification,
-                Industries     = SplitCsv(user.Profile?.PreferredIndustries),
-                JobTypes       = SplitCsv(user.Profile?.JobTypePreference),
-                WorkLocation   = user.Profile?.LocationPreference,
-                SalaryRange    = user.Profile?.SalaryExpectation,
-                CareerGoal     = user.Profile?.CareerGoals,
-                TechSkills     = user.Skills
-                                    .Where(s => s.SkillType == "technical")
-                                    .Select(s => s.SkillName)
-                                    .ToList(),
-                SoftSkills     = user.Skills
-                                    .Where(s => s.SkillType == "soft")
-                                    .Select(s => s.SkillName)
-                                    .ToList(),
-                Languages      = user.Skills
-                                    .Where(s => s.SkillType == "language")
-                                    .Select(s => s.SkillName)
-                                    .ToList(),
-                Certifications = user.Skills
-                                    .Where(s => s.SkillType == "certification")
-                                    .Select(s => s.SkillName)
-                                    .ToList(),
+                FirstName =
+                    nameParts.ElementAtOrDefault(0)
+                    ?? string.Empty,
+
+                LastName =
+                    nameParts.ElementAtOrDefault(1)
+                    ?? string.Empty,
+
+                Email = user.Email,
+
+                Institution =
+                    user.Profile?.Institution,
+
+                DegreeLevel =
+                    user.Profile?.Degree,
+
+                FieldOfStudy =
+                    user.Profile?.FieldOfStudy,
+
+                GraduationYear =
+                    user.Profile?.GraduationYear
+                        ?.ToString(),
+
+                Classification =
+                    user.Profile?.GpaClassification,
+
+                Industries =
+                    SplitCsv(
+                        user.Profile
+                            ?.PreferredIndustries),
+
+                JobTypes =
+                    SplitCsv(
+                        user.Profile
+                            ?.JobTypePreference),
+
+                WorkLocation =
+                    user.Profile?.LocationPreference,
+
+                SalaryRange =
+                    user.Profile?.SalaryExpectation,
+
+                CareerGoal =
+                    user.Profile?.CareerGoals,
+
+                TechSkills =
+                    user.Skills
+                        .Where(skill =>
+                            skill.SkillType ==
+                            "technical")
+                        .Select(skill =>
+                            skill.SkillName)
+                        .ToList(),
+
+                SoftSkills =
+                    user.Skills
+                        .Where(skill =>
+                            skill.SkillType ==
+                            "soft")
+                        .Select(skill =>
+                            skill.SkillName)
+                        .ToList(),
+
+                Languages =
+                    user.Skills
+                        .Where(skill =>
+                            skill.SkillType ==
+                            "language")
+                        .Select(skill =>
+                            skill.SkillName)
+                        .ToList(),
+
+                Certifications =
+                    user.Skills
+                        .Where(skill =>
+                            skill.SkillType ==
+                            "certification")
+                        .Select(skill =>
+                            skill.SkillName)
+                        .ToList()
             };
         }
 
         // ─── SAVE CV ──────────────────────────────────────────────────────────
 
-        public async Task SaveCvAsync(int userId, IFormFile file)
+        public async Task SaveCvAsync(
+    int userId,
+    IFormFile file,
+    CancellationToken cancellationToken = default)
         {
-            var user = await _db.Users.FindAsync(userId)
-                ?? throw new Exception("User not found.");
+            User user =
+                await _db.Users.FindAsync(
+                    [userId],
+                    cancellationToken)
+                ?? throw new InvalidOperationException(
+                    "Authenticated user was not found.");
 
-            var safeFileName = $"{userId}_{DateTime.UtcNow:yyyyMMddHHmmss}{Path.GetExtension(file.FileName)}";
-            var filePath     = Path.Combine(_cvStoragePath, safeFileName);
+            string extension =
+                Path.GetExtension(file.FileName)
+                    .ToLowerInvariant();
 
-            await using (var stream = new FileStream(filePath, FileMode.Create))
-                await file.CopyToAsync(stream);
+            string safeFileName =
+                $"{userId}_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{extension}";
 
-            // Store CV record in CV_DOCUMENTS table
-            var cvDoc = new CvDocument
+            string filePath =
+                Path.Combine(
+                    _cvStoragePath,
+                    safeFileName);
+
+            await using (
+                var stream =
+                    new FileStream(
+                        filePath,
+                        FileMode.CreateNew,
+                        FileAccess.Write,
+                        FileShare.None))
             {
-                UserId     = userId,
-                FileName   = file.FileName,
-                FilePath   = filePath,
-                FileType   = Path.GetExtension(file.FileName).TrimStart('.'),
-                IsBaseCv   = true,
-                CreatedAt  = DateTime.UtcNow,
-            };
+                await file.CopyToAsync(
+                    stream,
+                    cancellationToken);
+            }
 
-            _db.CvDocuments.Add(cvDoc);
+            var cvDocument =
+                new CvDocument
+                {
+                    UserId = userId,
+                    FileName = file.FileName,
+                    FilePath = filePath,
+                    FileType =
+                        extension.TrimStart('.'),
+                    IsBaseCv = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+            _db.CvDocuments.Add(
+                cvDocument);
 
             try
             {
-                var parsedText = await ExtractCvTextAsync(filePath, file.ContentType);
-                // Store parsed text in changelog field as a temporary measure
-                // (add a parsed_text column to CV_DOCUMENTS if you want proper storage)
-                cvDoc.Changelog = parsedText;
+                string parsedText =
+                    await ExtractCvTextAsync(
+                        filePath,
+                        file.ContentType,
+                        cancellationToken);
+
+                cvDocument.Changelog =
+                    parsedText;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                _logger.LogWarning(ex, "CV text extraction failed — storing file only.");
+                _logger.LogWarning(
+                    exception,
+                    "CV text extraction failed for user {UserId}. The file will still be stored.",
+                    userId);
             }
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(
+                cancellationToken);
         }
 
         // ─── SKILLS SYNC ──────────────────────────────────────────────────────
 
-        private async Task SyncSkillsAsync(int userId, ProfileRequest req)
+        private async Task SyncSkillsAsync(
+     int userId,
+     ProfileRequest request,
+     CancellationToken cancellationToken = default)
         {
-            // Remove old skills for this user and re-insert
-            var existing = _db.Skills.Where(s => s.UserId == userId);
-            _db.Skills.RemoveRange(existing);
+            List<Skill> existingSkills =
+                await _db.Skills
+                    .Where(skill =>
+                        skill.UserId == userId)
+                    .ToListAsync(
+                        cancellationToken);
 
-            var allSkills = new List<Skill>();
+            _db.Skills.RemoveRange(
+                existingSkills);
 
-            allSkills.AddRange(req.TechSkills.Select(s => new Skill
-                { UserId = userId, SkillName = s, SkillType = "technical", ProficiencyLevel = "intermediate" }));
+            var skills =
+                new List<Skill>();
 
-            allSkills.AddRange(req.SoftSkills.Select(s => new Skill
-                { UserId = userId, SkillName = s, SkillType = "soft", ProficiencyLevel = "intermediate" }));
+            skills.AddRange(
+                request.TechSkills.Select(
+                    skillName =>
+                        new Skill
+                        {
+                            UserId = userId,
+                            SkillName = skillName.Trim(),
+                            SkillType = "technical",
+                            ProficiencyLevel =
+                                "intermediate"
+                        }));
 
-            allSkills.AddRange(req.Languages.Select(s => new Skill
-                { UserId = userId, SkillName = s, SkillType = "language", ProficiencyLevel = "fluent" }));
+            skills.AddRange(
+                request.SoftSkills.Select(
+                    skillName =>
+                        new Skill
+                        {
+                            UserId = userId,
+                            SkillName = skillName.Trim(),
+                            SkillType = "soft",
+                            ProficiencyLevel =
+                                "intermediate"
+                        }));
 
-            allSkills.AddRange(req.Certifications.Select(s => new Skill
-                { UserId = userId, SkillName = s, SkillType = "certification", ProficiencyLevel = "certified" }));
+            skills.AddRange(
+                request.Languages.Select(
+                    skillName =>
+                        new Skill
+                        {
+                            UserId = userId,
+                            SkillName = skillName.Trim(),
+                            SkillType = "language",
+                            ProficiencyLevel =
+                                "fluent"
+                        }));
 
-            if (allSkills.Any())
-                await _db.Skills.AddRangeAsync(allSkills);
+            skills.AddRange(
+                request.Certifications.Select(
+                    skillName =>
+                        new Skill
+                        {
+                            UserId = userId,
+                            SkillName = skillName.Trim(),
+                            SkillType =
+                                "certification",
+                            ProficiencyLevel =
+                                "certified"
+                        }));
+
+            skills =
+                skills
+                    .Where(skill =>
+                        !string.IsNullOrWhiteSpace(
+                            skill.SkillName))
+                    .ToList();
+
+            if (skills.Count > 0)
+            {
+                await _db.Skills.AddRangeAsync(
+                    skills,
+                    cancellationToken);
+            }
         }
 
         // ─── CV TEXT EXTRACTION ───────────────────────────────────────────────
 
-        private async Task<string> ExtractCvTextAsync(string filePath, string contentType)
+        private async Task<string> ExtractCvTextAsync(
+            string filePath,
+            string contentType,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(_geminiKey)) return string.Empty;
             if (!contentType.Contains("pdf")) return string.Empty;
 
-            var fileBytes = await File.ReadAllBytesAsync(filePath);
-            var base64    = Convert.ToBase64String(fileBytes);
+            byte[] fileBytes =
+                await File.ReadAllBytesAsync(
+                    filePath,
+                    cancellationToken); var base64    = Convert.ToBase64String(fileBytes);
 
             var requestBody = new
             {
@@ -228,10 +405,10 @@ namespace Dwuma.Services
             var content  = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _geminiKey);
 
-            var response = await _httpClient.PostAsync("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + _geminiKey, content);
+            HttpResponseMessage response = await _httpClient.PostAsync("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + _geminiKey, content, cancellationToken);
             if (!response.IsSuccessStatusCode) return string.Empty;
 
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
             return doc.RootElement
                 .GetProperty("choices")[0]
                 .GetProperty("message")

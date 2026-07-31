@@ -1,11 +1,15 @@
-using Microsoft.AspNetCore.Mvc;
 using Dwuma.Models;
 using Dwuma.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.ComponentModel.DataAnnotations;
 
 namespace Dwuma.Controllers
 {
     [ApiController]
+    [Authorize]
+    [EnableRateLimiting("ai-policy")]
     [Route("api/[controller]")]
     [Produces("application/json")]
     public class ResumeTailorController : ControllerBase

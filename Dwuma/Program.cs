@@ -1,12 +1,15 @@
+using Dwuma.Infrastructure;
+using Dwuma.Models.Data.DwumaContext;
 using Dwuma.Models.Data.DwumaContext;
 using Dwuma.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Dwuma.Models.Data.DwumaContext;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -154,6 +157,49 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddProblemDetails();
+
+builder.Services.AddExceptionHandler<
+    GlobalExceptionHandler>();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+
+    options.AddFixedWindowLimiter(
+        "ai-policy",
+        limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 10;
+            limiterOptions.Window =
+                TimeSpan.FromMinutes(1);
+
+            limiterOptions.QueueLimit = 0;
+
+            limiterOptions.QueueProcessingOrder =
+                QueueProcessingOrder.OldestFirst;
+
+            limiterOptions.AutoReplenishment = true;
+        });
+
+    options.AddFixedWindowLimiter(
+        "auth-policy",
+        limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 5;
+            limiterOptions.Window =
+                TimeSpan.FromMinutes(1);
+
+            limiterOptions.QueueLimit = 0;
+
+            limiterOptions.QueueProcessingOrder =
+                QueueProcessingOrder.OldestFirst;
+
+            limiterOptions.AutoReplenishment = true;
+        });
+});
+
 var app = builder.Build();
 
 using (IServiceScope scope =
@@ -186,6 +232,9 @@ app.UseSwaggerUI(options =>
 
 });
 
+
+app.UseExceptionHandler();
+
 app.UseCors("FrontendPolicy");
 
 app.UseDefaultFiles();
@@ -193,6 +242,8 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseRateLimiter();
 
 app.MapControllers();
 

@@ -1,11 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using Dwuma.Models;
 using Dwuma.Services;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Dwuma.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [EnableRateLimiting("ai-policy")]
+    [Authorize]
     [Produces("application/json")]
     public class SkillsGapController : ControllerBase
     {

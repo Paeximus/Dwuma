@@ -1,10 +1,14 @@
 ﻿using Dwuma.Models.Interview;
 using Dwuma.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Dwuma.Controllers;
 
 [ApiController]
+[Authorize]
+[EnableRateLimiting("ai-policy")]
 [Route("api/interview")]
 public sealed class InterviewCoachController : ControllerBase
 {
