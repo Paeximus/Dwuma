@@ -70,25 +70,13 @@ public sealed class AuthService
             savedRows,
             user.Id);
 
-        GeneratedToken generatedToken =
-            _jwtTokenService.CreateToken(user);
-
-        user.JwtToken =
-            generatedToken.Value;
-
-        user.UpdatedAt =
-            DateTime.UtcNow;
-
-        await _context.SaveChangesAsync(
-            cancellationToken);
+        GeneratedToken generatedToken = _jwtTokenService.CreateToken(user);
 
         _logger.LogInformation(
             "New user registered with ID {UserId}.",
             user.Id);
 
-        return MapResponse(
-            user,
-            generatedToken);
+        return MapResponse(user, generatedToken);
     }
 
     public async Task<AuthResponse> LoginAsync(
@@ -142,17 +130,22 @@ public sealed class AuthService
                     request.Password);
         }
 
-        GeneratedToken generatedToken =
-            _jwtTokenService.CreateToken(user);
+        GeneratedToken generatedToken = _jwtTokenService.CreateToken(user);
 
-        user.JwtToken =
-            generatedToken.Value;
+        if (result ==
+            PasswordVerificationResult.SuccessRehashNeeded)
+        {
+            user.PasswordHash =
+                _passwordHasher.HashPassword(
+                    user,
+                    request.Password);
 
-        user.UpdatedAt =
-            DateTime.UtcNow;
+            user.UpdatedAt =
+                DateTime.UtcNow;
 
-        await _context.SaveChangesAsync(
-            cancellationToken);
+            await _context.SaveChangesAsync(
+                cancellationToken);
+        }
 
         _logger.LogInformation(
             "User {UserId} logged in.",

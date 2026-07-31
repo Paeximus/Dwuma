@@ -2,6 +2,8 @@
 using Dwuma.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using Dwuma.Extensions;
 
 namespace Dwuma.Controllers;
 
@@ -104,4 +106,27 @@ public sealed class AuthController : ControllerBase
             });
         }
     }
+
+    [Authorize]
+    [HttpGet("me")]
+    public IActionResult GetCurrentUser()
+    {
+        int userId = User.GetUserId();
+
+        string? fullName =
+            User.FindFirstValue(
+                ClaimTypes.Name);
+
+        string? email =
+            User.FindFirstValue(
+                ClaimTypes.Email);
+
+        return Ok(new
+        {
+            userId,
+            fullName,
+            email
+        });
+    }
+
 }
