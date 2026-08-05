@@ -6,10 +6,20 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Reflection;
 using System.Text;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+string? port =
+    Environment.GetEnvironmentVariable("PORT");
+
+if (!string.IsNullOrWhiteSpace(port))
+{
+    builder.WebHost.UseUrls(
+        $"http://0.0.0.0:{port}");
+}
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -23,6 +33,18 @@ builder.Services.AddSwaggerGen(options =>
             Title = "Dwuma API",
             Version = "v1"
         });
+
+    string xmlFile =
+    $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+
+    string xmlPath =
+        Path.Combine(
+            AppContext.BaseDirectory,
+            xmlFile);
+
+    options.IncludeXmlComments(
+        xmlPath,
+        includeControllerXmlComments: true);
 
     options.AddSecurityDefinition(
         "Bearer",
@@ -84,20 +106,35 @@ builder.Services.AddScoped<JobMatchService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<AuthService>();
 
+string[] allowedOrigins =
+    builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>()
+    ?? [];
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("FrontendPolicy", policy =>
-    {
-        policy
-            .WithOrigins(
-                "https://localhost:7063",
-                "http://localhost:5063",
-                "http://localhost:3000",
-                "http://127.0.0.1:5500",
-                "http://localhost:5500")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
+    options.AddPolicy(
+        "FrontendPolicy",
+        policy =>
+        {
+            if (allowedOrigins.Length == 0)
+            {
+                policy
+                    .WithOrigins(
+                        "http://localhost:5173",
+                        "http://127.0.0.1:5173")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+
+                return;
+            }
+
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
 });
 
 builder.Services.Configure<
@@ -222,38 +259,47 @@ builder.Services.AddHttpClient<CareerjetJobService>(
 
 var app = builder.Build();
 
-using (IServiceScope scope =
-       app.Services.CreateScope())
-{
-    DwumaContext context =
-        scope.ServiceProvider
-            .GetRequiredService<DwumaContext>();
-
-    Console.WriteLine(
-        $"ACTIVE DATABASE: {context.Database.GetDbConnection().Database}");
-
-    Console.WriteLine(
-        $"ACTIVE SERVER: {context.Database.GetDbConnection().DataSource}");
-}
 
 app.UseSwagger();
+bool enableSwagger =
+    app.Environment.IsDevelopment() ||
+    builder.Configuration.GetValue<bool>(
+        "Swagger:Enabled");
 
-app.UseSwaggerUI(options =>
+if (enableSwagger)
 {
-    options.SwaggerEndpoint(
-        "/swagger/v1/swagger.json",
-        "Dwuma API");
+    app.UseSwagger();
 
-    options.RoutePrefix = "swagger";
-    options.DocumentTitle = "Dwuma API";
-    options.DefaultModelsExpandDepth(2);
-    options.DisplayRequestDuration();
-    options.EnableFilter();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint(
+            "/swagger/v1/swagger.json",
+            "Dwuma API");
 
-});
+        options.RoutePrefix = "swagger";
+        options.DocumentTitle = "Dwuma API";
+        options.DefaultModelsExpandDepth(2);
+        options.DisplayRequestDuration();
+        options.EnableFilter();
+    });
+}
 
+app.MapGet(
+    "/health",
+    () => Results.Ok(new
+    {
+        status = "Healthy",
+        service = "Dwuma API",
+        time = DateTime.UtcNow
+    }))
+    .AllowAnonymous();
 
 app.UseExceptionHandler();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("FrontendPolicy");
 
@@ -267,15 +313,9 @@ app.UseRateLimiter();
 
 app.MapControllers();
 
-app.Use(async (context, next) =>
-{
-    if (context.Request.Path == "/")
-    {
-        context.Response.Redirect("/swagger");
-        return;
-    }
-
-    await next();
-});
+app.MapGet(
+    "/",
+    () => Results.Redirect("/swagger"))
+    .AllowAnonymous();
 
 app.Run();

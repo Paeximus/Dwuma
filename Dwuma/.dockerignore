@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.git/
+.gitignore
+cv-uploads/
+node_modules/
+*.user
+*.suo
+.env
+appsettings.Development.json

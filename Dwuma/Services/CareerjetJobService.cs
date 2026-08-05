@@ -1,8 +1,9 @@
-﻿using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
+﻿using Azure;
 using Dwuma.Models.Jobs;
 using Microsoft.AspNetCore.WebUtilities;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 
 namespace Dwuma.Services;
 
@@ -86,13 +87,26 @@ public sealed class CareerjetJobService
                 credentials);
 
         using HttpResponseMessage response =
-            await _httpClient.SendAsync(
-                httpRequest,
-                cancellationToken);
+        await _httpClient.SendAsync(
+        httpRequest,
+        cancellationToken);
 
         string responseBody =
             await response.Content.ReadAsStringAsync(
                 cancellationToken);
+
+        if (response.StatusCode ==
+            System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning(
+                "Careerjet rejected the request from the current server IP. Response: {Response}",
+                responseBody);
+
+            throw new UnauthorizedAccessException(
+                "Careerjet rejected this server's public IP address. " +
+                "Add the current public IP to the Careerjet publisher whitelist.");
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError(
@@ -102,7 +116,7 @@ public sealed class CareerjetJobService
                 responseBody);
 
             throw new HttpRequestException(
-                $"Careerjet failed with status {(int)response.StatusCode}: {responseBody}");
+                $"Careerjet failed with HTTP {(int)response.StatusCode}.");
         }
 
         CareerjetSearchResponse? result =
@@ -116,6 +130,16 @@ public sealed class CareerjetJobService
                 "Careerjet returned an empty response.");
         }
 
+        if (string.Equals(
+                result.Type,
+                "LOCATIONS",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                string.IsNullOrWhiteSpace(result.Message)
+                    ? "Careerjet could not resolve the requested location."
+                    : result.Message);
+        }
         List<GhanaJobResult> jobs =
             result.Jobs
                 .Select(job =>

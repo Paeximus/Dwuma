@@ -15,6 +15,9 @@ public sealed class CareerjetSearchResponse
 
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
+    
+    [JsonPropertyName("message")]
+    public List<string> Locations { get; set; } = [];
 
     [JsonPropertyName("jobs")]
     public List<CareerjetJob> Jobs { get; set; } = [];

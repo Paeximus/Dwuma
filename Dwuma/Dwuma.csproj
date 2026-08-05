@@ -7,6 +7,8 @@
 		<NoWarn>$(NoWarn);1591</NoWarn>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UserSecretsId>dwuma-12345-unique-guid</UserSecretsId>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
