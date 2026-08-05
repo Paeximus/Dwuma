@@ -48,7 +48,6 @@ public sealed class AuthService
 
         var user = new User
         {
-            FullName = request.FullName.Trim(),
             Email = email,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
