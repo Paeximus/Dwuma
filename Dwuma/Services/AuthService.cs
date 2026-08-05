@@ -162,7 +162,7 @@ public sealed class AuthService
         return new AuthResponse
         {
             UserId = user.Id,
-            FullName = user.FullName,
+            //FullName = user.FullName,
             Email = user.Email,
             Token = generatedToken.Value,
             ExpiresAt =

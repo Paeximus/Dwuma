@@ -4,9 +4,9 @@ namespace Dwuma.Models.Authentication;
 
 public sealed class RegisterRequest
 {
-    [Required]
-    [StringLength(150, MinimumLength = 2)]
-    public string FullName { get; set; } = string.Empty;
+    //[Required]
+    //[StringLength(150, MinimumLength = 2)]
+    //public string FullName { get; set; } = string.Empty;
 
     [Required]
     [EmailAddress]
