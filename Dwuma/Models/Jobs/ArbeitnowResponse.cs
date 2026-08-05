@@ -1,6 +1,5 @@
 ﻿using System.Text.Json.Serialization;
 using Dwuma.Converters;
-using System.Text.Json.Serialization;
 
 namespace Dwuma.Models.Jobs;
 

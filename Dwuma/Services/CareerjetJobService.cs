@@ -1,5 +1,4 @@
-﻿using Azure;
-using Dwuma.Models.Jobs;
+﻿using Dwuma.Models.Jobs;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Net.Http.Headers;
 using System.Text;

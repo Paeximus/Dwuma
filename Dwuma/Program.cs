@@ -84,7 +84,9 @@ string connectionString =
         "Connection string 'DefaultConnection' was not found.");
 
 builder.Services.AddDbContext<DwumaContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseMySql(
+            connectionString,
+            ServerVersion.AutoDetect(connectionString)));
 
 builder.Services.AddHttpClient<GeminiService>(client =>
 {
