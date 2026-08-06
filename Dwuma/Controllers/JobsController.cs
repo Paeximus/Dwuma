@@ -1,5 +1,6 @@
 ﻿using Dwuma.Models.Jobs;
 using Dwuma.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Dwuma.Controllers;
@@ -8,52 +9,62 @@ namespace Dwuma.Controllers;
 [Route("api/jobs")]
 public sealed class JobsController : ControllerBase
 {
-    private readonly JobSearchService _jobSearchService;
-    private readonly ILogger<JobsController> _logger;
+    private readonly JoobleJobService _joobleJobService;
 
-    public JobsController(
-        JobSearchService jobSearchService,
-        ILogger<JobsController> logger)
+    public JobsController(JoobleJobService joobleJobService)
     {
-        _jobSearchService = jobSearchService;
-        _logger = logger;
+        _joobleJobService = joobleJobService;
     }
 
+    [AllowAnonymous]
     [HttpGet("search")]
-    public async Task<IActionResult> Search(
-    [FromQuery] string? query,
-    [FromQuery] string? location,
-    [FromQuery] int page = 1,
-    [FromQuery] bool? remoteOnly = null,
-    [FromQuery] bool englishOnly = false,
-    CancellationToken cancellationToken = default)
+    [ProducesResponseType(typeof(GhanaJobSearchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<GhanaJobSearchResponse>> Search(
+        [FromQuery] string? query = "jobs",
+        [FromQuery] string? location = "Ghana",
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] bool companySearch = false,
+        CancellationToken cancellationToken = default)
     {
-        try
+        var request = new GhanaJobSearchRequest
         {
-            JobSearchResponse result =
-                await _jobSearchService.SearchAsync(
-                    query,
-                    location,
-                    page,
-                    remoteOnly,
-                    englishOnly,
-                    cancellationToken);
+            Keywords = query,
+            Location = location,
+            Page = page,
+            PageSize = pageSize,
+            CompanySearch = companySearch
+        };
 
-            return Ok(result);
-        }
-        catch (InvalidOperationException ex)
+        GhanaJobSearchResponse result =
+            await _joobleJobService.SearchAsync(
+                request,
+                cancellationToken);
+
+        return Ok(result);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("ghana")]
+    [ProducesResponseType(typeof(GhanaJobSearchResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<GhanaJobSearchResponse>> Ghana(
+        [FromQuery] string? keywords = "jobs",
+        [FromQuery] string? location = "Ghana",
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new GhanaJobSearchRequest
         {
-            _logger.LogError(
-                ex,
-                "Job search failed.");
+            Keywords = keywords,
+            Location = location,
+            Page = page,
+            PageSize = pageSize
+        };
 
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    message =
-                        "The external job provider is currently unavailable."
-                });
-        }
+        return Ok(await _joobleJobService.SearchAsync(
+            request,
+            cancellationToken));
     }
 }

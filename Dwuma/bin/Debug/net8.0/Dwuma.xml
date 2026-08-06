@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Dwuma</name>
+    </assembly>
+    <members>
+        <member name="T:Dwuma.Controllers.ProfileController">
+            <summary>
+            Manages the authenticated user's profile and CV documents.
+            </summary>
+        </member>
+        <member name="M:Dwuma.Controllers.ProfileController.CreateOrUpdate(Dwuma.Models.ProfileRequest,System.Threading.CancellationToken)">
+            <summary>
+            Creates or updates the authenticated user's profile.
+            </summary>
+        </member>
+        <member name="M:Dwuma.Controllers.ProfileController.GetMyProfile(System.Threading.CancellationToken)">
+            <summary>
+            Retrieves the authenticated user's profile.
+            </summary>
+        </member>
+        <member name="M:Dwuma.Controllers.ProfileController.UploadCv(Dwuma.Controllers.UploadCvRequest,System.Threading.CancellationToken)">
+            <summary>
+            Uploads a CV for the authenticated user.
+            </summary>
+        </member>
+        <member name="T:Dwuma.Controllers.UploadCvRequest">
+            <summary>
+            DTO for CV upload requests.
+            </summary>
+        </member>
+        <member name="P:Dwuma.Models.ChangelogItem.Type">
+            <summary>rewrite | added | removed | keyword</summary>
+        </member>
+        <member name="P:Dwuma.Models.SkillItem.Status">
+            <summary>present | partial | absent</summary>
+        </member>
+        <member name="P:Dwuma.Models.SkillItem.Level">
+            <summary>foundational | intermediate | advanced</summary>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,9 @@
+wwwroot\css\main.css
+wwwroot\js\onboarding.js
+wwwroot\js\profile.js
+wwwroot\js\resume-tailor.js
+wwwroot\js\skills-gap.js
+wwwroot\pages\onboarding.html
+wwwroot\pages\profile.html
+wwwroot\pages\resume-tailor.html
+wwwroot\pages\skills-gap.html

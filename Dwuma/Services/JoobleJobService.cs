@@ -1,5 +1,7 @@
-﻿using System.Net.Http.Json;
+﻿using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Dwuma.Models.Jobs;
 
 namespace Dwuma.Services;
@@ -30,6 +32,8 @@ public sealed class JoobleJobService
         GhanaJobSearchRequest request,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         string apiKey =
             _configuration["Jooble:ApiKey"]
             ?? throw new InvalidOperationException(
@@ -39,48 +43,75 @@ public sealed class JoobleJobService
             _configuration["Jooble:BaseUrl"]
             ?? "https://jooble.org/api/";
 
-        string location =
-            NormalizeGhanaLocation(request.Location);
+        // Add the safe diagnostic log here
+        _logger.LogInformation(
+            "Jooble configuration: Base URL {BaseUrl}, key configured {HasKey}, key length {KeyLength}.",
+            baseUrl,
+            !string.IsNullOrWhiteSpace(apiKey),
+            apiKey.Length);
 
-        var joobleRequest =
-            new JoobleSearchRequest
-            {
-                Keywords = request.Keywords.Trim(),
-                Location = location,
-                Page = request.Page.ToString(),
-                ResultOnPage = request.PageSize.ToString(),
-                CompanySearch =
-                    request.CompanySearch
-                        ? "true"
-                        : "false"
-            };
+        string requestUrl =
+            $"{baseUrl.TrimEnd('/')}/{apiKey.Trim()}";
+
+        string location = NormalizeGhanaLocation(request.Location);
+        int page = Math.Max(request.Page, 1);
+        int pageSize = Math.Clamp(request.PageSize, 1, 50);
+
+        var joobleRequest = new JoobleSearchRequest
+        {
+            Keywords = string.IsNullOrWhiteSpace(request.Keywords)
+                ? "jobs"
+                : request.Keywords.Trim(),
+            Location = location,
+            Page = page.ToString(),
+            ResultOnPage = pageSize.ToString(),
+            CompanySearch = request.CompanySearch ? "true" : "false"
+        };
+
+        string requestJson =
+            JsonSerializer.Serialize(
+                joobleRequest,
+                JsonOptions);
+
+        string endpoint = $"{baseUrl.TrimEnd('/')}/{apiKey}";
+
+        _logger.LogInformation(
+            "Searching Jooble. Keywords: {Keywords}; Location: {Location}; Page: {Page}; PageSize: {PageSize}",
+            joobleRequest.Keywords,
+            joobleRequest.Location,
+            page,
+            pageSize);
 
         using HttpResponseMessage response =
             await _httpClient.PostAsJsonAsync(
-                $"{baseUrl.TrimEnd('/')}/{apiKey}",
+                requestUrl,
                 joobleRequest,
                 JsonOptions,
                 cancellationToken);
 
+        string responseBody =
+            await response.Content.ReadAsStringAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Jooble returned status {StatusCode}. Response: {ResponseBody}",
+            response.StatusCode,
+            responseBody);
+
         if (!response.IsSuccessStatusCode)
         {
-            string error =
-                await response.Content.ReadAsStringAsync(
-                    cancellationToken);
-
             _logger.LogError(
                 "Jooble request failed with status {StatusCode}. Response: {Response}",
                 response.StatusCode,
-                error);
+                responseBody);
 
             throw new HttpRequestException(
-                "The Ghana jobs provider could not complete the request.");
+                $"The Ghana jobs provider returned HTTP {(int)response.StatusCode}.");
         }
 
         JoobleSearchResponse? joobleResponse =
-            await response.Content.ReadFromJsonAsync<JoobleSearchResponse>(
-                JsonOptions,
-                cancellationToken);
+            JsonSerializer.Deserialize<JoobleSearchResponse>(
+                responseBody,
+                JsonOptions);
 
         if (joobleResponse is null)
         {
@@ -88,10 +119,19 @@ public sealed class JoobleJobService
                 "The Ghana jobs provider returned an empty response.");
         }
 
+        _logger.LogInformation(
+            "Jooble returned {TotalCount} total jobs and {PageCount} jobs on this page.",
+            joobleResponse.TotalCount,
+            joobleResponse.Jobs.Count);
+
+        // Do not apply a second strict Ghana filter here. Jooble already searched
+        // with the Ghana location, and an extra filter can remove valid entries
+        // whose location is shown as Remote, Nationwide, or West Africa.
         List<GhanaJobResult> jobs =
             joobleResponse.Jobs
-                .Where(IsGhanaJob)
-                .Select(MapJob)
+                .Select(
+                    (Models.Jobs.JoobleJob job) =>
+                        MapJob(job))
                 .Where(job =>
                     !string.IsNullOrWhiteSpace(job.Title) &&
                     !string.IsNullOrWhiteSpace(job.ApplyUrl))
@@ -106,109 +146,33 @@ public sealed class JoobleJobService
         {
             ProviderTotalCount = joobleResponse.TotalCount,
             ReturnedCount = jobs.Count,
-            Page = request.Page,
-            PageSize = request.PageSize,
+            Page = page,
+            PageSize = pageSize,
             Location = location,
             Jobs = jobs
         };
     }
 
     private static GhanaJobResult MapJob(
-        JoobleJob source)
+    Dwuma.Models.Jobs.JoobleJob source)
     {
         return new GhanaJobResult
         {
-            ExternalId =
-                source.Id?.ToString()
-                ?? string.Empty,
-
-            Title =
-                CleanText(source.Title),
-
-            Company =
-                CleanText(source.Company),
-
-            Location =
-                CleanText(source.Location),
-
-            Description =
-                CleanText(source.Snippet),
-
-            Salary =
-                CleanText(source.Salary),
-
-            JobType =
-                CleanText(source.Type),
-
-            Source =
-                CleanText(source.Source),
-
-            ApplyUrl =
-                source.Link?.Trim()
-                ?? string.Empty,
-
-            UpdatedAt =
-                source.Updated
+            ExternalId = source.Id?.Trim() ?? string.Empty,
+            Title = CleanText(source.Title),
+            Company = CleanText(source.Company),
+            Location = CleanText(source.Location),
+            Description = CleanText(source.Snippet),
+            Salary = CleanText(source.Salary),
+            JobType = CleanText(source.Type),
+            Source = CleanText(source.Source),
+            ApplyUrl = source.Link?.Trim() ?? string.Empty,
+            UpdatedAt = source.Updated
         };
     }
 
-    private static bool IsGhanaJob(
-    JoobleJob job)
-    {
-        string location =
-            job.Location?.Trim()
-            ?? string.Empty;
 
-        string combined =
-            $"{job.Location} {job.Snippet}"
-                .ToLowerInvariant();
-
-        string[] ghanaLocations =
-        [
-            "ghana",
-        "accra",
-        "greater accra",
-        "tema",
-        "kumasi",
-        "ashanti",
-        "takoradi",
-        "sekondi",
-        "western region",
-        "tamale",
-        "northern region",
-        "cape coast",
-        "central region",
-        "koforidua",
-        "eastern region",
-        "sunyani",
-        "bono region",
-        "ho",
-        "volta region",
-        "wa",
-        "upper west",
-        "bolgatanga",
-        "upper east",
-        "techiman",
-        "obuasi"
-        ];
-
-        bool isGhanaLocation =
-            ghanaLocations.Any(
-                ghanaLocation =>
-                    combined.Contains(
-                        ghanaLocation));
-
-        bool isRemoteGhana =
-            location.Contains(
-                "remote",
-                StringComparison.OrdinalIgnoreCase) &&
-            combined.Contains("ghana");
-
-        return isGhanaLocation || isRemoteGhana;
-    }
-
-    private static string NormalizeGhanaLocation(
-    string? location)
+    private static string NormalizeGhanaLocation(string? location)
     {
         if (string.IsNullOrWhiteSpace(location))
         {
@@ -219,46 +183,25 @@ public sealed class JoobleJobService
 
         string[] allowedLocations =
         [
-            "ghana",
-        "accra",
-        "tema",
-        "kumasi",
-        "takoradi",
-        "sekondi",
-        "tamale",
-        "cape coast",
-        "koforidua",
-        "sunyani",
-        "ho",
-        "wa",
-        "bolgatanga",
-        "techiman",
-        "obuasi"
+            "ghana", "accra", "tema", "kumasi", "takoradi", "sekondi",
+            "tamale", "cape coast", "koforidua", "sunyani", "ho", "wa",
+            "bolgatanga", "techiman", "obuasi"
         ];
 
-        bool isAllowed =
-            allowedLocations.Any(
-                allowed =>
-                    trimmed.Contains(
-                        allowed,
-                        StringComparison.OrdinalIgnoreCase));
+        bool isAllowed = allowedLocations.Any(allowed =>
+            trimmed.Contains(allowed, StringComparison.OrdinalIgnoreCase));
 
         if (!isAllowed)
         {
-            throw new ArgumentException(
-                "Location must be within Ghana.");
+            throw new ArgumentException("Location must be within Ghana.");
         }
 
-        if (trimmed.Equals(
-                "Ghana",
-                StringComparison.OrdinalIgnoreCase))
+        if (trimmed.Equals("Ghana", StringComparison.OrdinalIgnoreCase))
         {
             return "Ghana";
         }
 
-        if (trimmed.Contains(
-                "Ghana",
-                StringComparison.OrdinalIgnoreCase))
+        if (trimmed.Contains("Ghana", StringComparison.OrdinalIgnoreCase))
         {
             return trimmed;
         }
@@ -266,21 +209,19 @@ public sealed class JoobleJobService
         return $"{trimmed}, Ghana";
     }
 
-    private static string CleanText(
-        string? value)
+    private static string CleanText(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             return string.Empty;
         }
 
-        return value
-            .Replace("<b>", string.Empty)
-            .Replace("</b>", string.Empty)
-            .Replace("&nbsp;", " ")
+        string withoutTags = Regex.Replace(value, "<.*?>", " ");
+
+        return WebUtility
+            .HtmlDecode(withoutTags)
+            .Replace("\r", " ")
+            .Replace("\n", " ")
             .Trim();
     }
-
-
-
 }

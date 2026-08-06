@@ -2,13 +2,14 @@
 
 namespace Dwuma.Models.Jobs;
 
-internal sealed class JoobleSearchRequest
+
+public sealed class JoobleSearchRequest
 {
     [JsonPropertyName("keywords")]
     public string Keywords { get; set; } = string.Empty;
 
     [JsonPropertyName("location")]
-    public string Location { get; set; } = string.Empty;
+    public string Location { get; set; } = "Ghana";
 
     [JsonPropertyName("page")]
     public string Page { get; set; } = "1";
@@ -20,7 +21,7 @@ internal sealed class JoobleSearchRequest
     public string CompanySearch { get; set; } = "false";
 }
 
-internal sealed class JoobleSearchResponse
+public sealed class JoobleSearchResponse
 {
     [JsonPropertyName("totalCount")]
     public int TotalCount { get; set; }
@@ -29,16 +30,19 @@ internal sealed class JoobleSearchResponse
     public List<JoobleJob> Jobs { get; set; } = [];
 }
 
-internal sealed class JoobleJob
+public sealed class JoobleJob
 {
     [JsonPropertyName("id")]
-    public object? Id { get; set; }
+    public string? Id { get; set; }
 
     [JsonPropertyName("title")]
     public string? Title { get; set; }
 
     [JsonPropertyName("location")]
     public string? Location { get; set; }
+
+    [JsonPropertyName("company")]
+    public string? Company { get; set; }
 
     [JsonPropertyName("snippet")]
     public string? Snippet { get; set; }
@@ -54,9 +58,6 @@ internal sealed class JoobleJob
 
     [JsonPropertyName("link")]
     public string? Link { get; set; }
-
-    [JsonPropertyName("company")]
-    public string? Company { get; set; }
 
     [JsonPropertyName("updated")]
     public DateTime? Updated { get; set; }

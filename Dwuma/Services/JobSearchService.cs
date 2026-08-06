@@ -1,165 +1,115 @@
 ﻿using System.Net.Http.Json;
-using System.Text.RegularExpressions;
+using System.Text.Json;
 using Dwuma.Models.Jobs;
 
 namespace Dwuma.Services;
 
 public sealed class JobSearchService
 {
-    private const string BaseUrl =
-        "https://www.arbeitnow.com/api/job-board-api";
-
     private readonly HttpClient _httpClient;
     private readonly ILogger<JobSearchService> _logger;
+    private readonly string _apiKey;
 
     public JobSearchService(
         HttpClient httpClient,
+        IConfiguration configuration,
         ILogger<JobSearchService> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
+
+        _apiKey =
+            configuration["Jooble:ApiKey"]
+            ?? throw new InvalidOperationException(
+                "Jooble API key is not configured.");
     }
 
-     public async Task<JobSearchResponse> SearchAsync(
-     string? query,
-     string? location,
-     int page = 1,
-     bool? remoteOnly = null,
-     bool englishOnly = false,
-     CancellationToken cancellationToken = default)
+    public async Task<JobSearchResponse> SearchAsync(
+        string? query,
+        string? location,
+        int page = 1,
+        bool? remoteOnly = null,
+        bool englishOnly = true,
+        CancellationToken cancellationToken = default)
     {
+        string searchQuery =
+            string.IsNullOrWhiteSpace(query)
+                ? "jobs"
+                : query.Trim();
+
+        string searchLocation =
+            string.IsNullOrWhiteSpace(location)
+                ? "Ghana"
+                : location.Trim();
+
         page = Math.Max(page, 1);
 
-        const int pagesToSearch = 5;
-        const int maximumResults = 30;
-
-        var jobs = new List<ExternalJobListing>();
-
-        for (
-            int currentPage = page;
-            currentPage < page + pagesToSearch;
-            currentPage++)
+        var requestBody = new
         {
-            string requestUrl =
-                $"{BaseUrl}?page={currentPage}";
+            keywords = searchQuery,
+            location = searchLocation,
+            page = page.ToString(),
+            ResultOnPage = "30",
+            radius = "100",
+            companysearch = "false"
+        };
 
-            try
-            {
-                using HttpResponseMessage response =
-                    await _httpClient.GetAsync(
-                        requestUrl,
-                        cancellationToken);
+        string requestUrl =
+            $"https://jooble.org/api/{_apiKey}";
 
-                if (!response.IsSuccessStatusCode)
+        _logger.LogInformation(
+            "Searching Jooble for {Query} in {Location}, page {Page}.",
+            searchQuery,
+            searchLocation,
+            page);
+
+        using HttpResponseMessage response =
+            await _httpClient.PostAsJsonAsync(
+                requestUrl,
+                requestBody,
+                cancellationToken);
+
+        string responseBody =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError(
+                "Jooble returned status {StatusCode}. Response: {ResponseBody}",
+                response.StatusCode,
+                responseBody);
+
+            throw new HttpRequestException(
+                $"Jooble returned HTTP {(int)response.StatusCode}.");
+        }
+
+        JoobleResponse? providerResponse =
+            JsonSerializer.Deserialize<JoobleResponse>(
+                responseBody,
+                new JsonSerializerOptions
                 {
-                    string errorBody =
-                        await response.Content.ReadAsStringAsync(
-                            cancellationToken);
+                    PropertyNameCaseInsensitive = true
+                });
 
-                    _logger.LogWarning(
-                        "Arbeitnow page {Page} returned status {StatusCode}. Body: {Body}",
-                        currentPage,
-                        response.StatusCode,
-                        errorBody);
-
-                    continue;
-                }
-
-                ArbeitnowResponse? providerResponse =
-                    await response.Content
-                        .ReadFromJsonAsync<ArbeitnowResponse>(
-                            cancellationToken:
-                                cancellationToken);
-
-                if (providerResponse?.Data is null ||
-                    providerResponse.Data.Count == 0)
-                {
-                    continue;
-                }
-
-                jobs.AddRange(
-                    providerResponse.Data.Select(MapJob));
-            }
-            catch (OperationCanceledException)
-                when (!cancellationToken.IsCancellationRequested)
-            {
-                _logger.LogWarning(
-                    "The request for Arbeitnow page {Page} timed out.",
-                    currentPage);
-            }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogWarning(
-                    ex,
-                    "The request for Arbeitnow page {Page} failed.",
-                    currentPage);
-            }
-        }
-
-        if (jobs.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "The job provider returned no available jobs.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(query))
-        {
-            string[] searchTerms =
-                query.Split(
-                    ' ',
-                    StringSplitOptions.RemoveEmptyEntries |
-                    StringSplitOptions.TrimEntries);
-
-            jobs = jobs
-                .Where(job =>
-                    searchTerms.Any(term =>
-                        ContainsIgnoreCase(
-                            job.Title,
-                            term) ||
-                        ContainsIgnoreCase(
-                            job.CompanyName,
-                            term) ||
-                        ContainsIgnoreCase(
-                            job.Description,
-                            term) ||
-                        ContainsIgnoreCase(
-                            job.Location,
-                            term) ||
-                        job.Tags.Any(tag =>
-                            ContainsIgnoreCase(
-                                tag,
-                                term)) ||
-                        job.JobTypes.Any(jobType =>
-                            ContainsIgnoreCase(
-                                jobType,
-                                term))))
-                .ToList();
-        }
-
-        if (!string.IsNullOrWhiteSpace(location))
-        {
-            string locationSearch =
-                location.Trim();
-
-            jobs = jobs
-                .Where(job =>
-                    ContainsIgnoreCase(
-                        job.Location,
-                        locationSearch))
-                .ToList();
-        }
-
-        if (englishOnly)
-        {
-            jobs = jobs
-                .Where(IsProbablyEnglish)
-                .ToList();
-        }
+        List<ExternalJobListing> jobs =
+            providerResponse?.Jobs?
+                .Select(MapJob)
+                .ToList()
+            ?? [];
 
         if (remoteOnly == true)
         {
             jobs = jobs
-                .Where(job => job.Remote)
+                .Where(job =>
+                    job.Remote ||
+                    ContainsIgnoreCase(
+                        job.Location,
+                        "remote") ||
+                    job.JobTypes.Any(type =>
+                        ContainsIgnoreCase(
+                            type,
+                            "remote")))
                 .ToList();
         }
 
@@ -170,12 +120,11 @@ public sealed class JobSearchService
                     : job.Url)
             .Select(group => group.First())
             .OrderByDescending(job => job.CreatedAt)
-            .Take(maximumResults)
             .ToList();
 
         return new JobSearchResponse
         {
-            Query = query?.Trim() ?? string.Empty,
+            Query = searchQuery,
             Page = page,
             Count = jobs.Count,
             Jobs = jobs
@@ -183,28 +132,62 @@ public sealed class JobSearchService
     }
 
     private static ExternalJobListing MapJob(
-        ArbeitnowJob source)
+        JoobleJob source)
     {
         return new ExternalJobListing
         {
-            Slug = source.Slug,
-            Title = source.Title,
-            CompanyName = source.CompanyName,
-            Location = source.Location,
-            Description = StripHtml(
-                source.Description),
-            Url = source.Url,
-            Remote = source.Remote,
-            Tags = source.Tags ?? [],
-            JobTypes = source.JobTypes ?? [],
-            CreatedAt =
-                source.CreatedAt > 0
-                    ? DateTimeOffset
-                        .FromUnixTimeSeconds(
-                            source.CreatedAt)
-                        .UtcDateTime
-                    : null
+            Slug =
+                !string.IsNullOrWhiteSpace(source.Id)
+                    ? source.Id
+                    : source.Link,
+
+            Title = source.Title ?? string.Empty,
+
+            CompanyName =
+                source.Company ?? string.Empty,
+
+            Location =
+                source.Location ?? string.Empty,
+
+            Description =
+                source.Snippet ?? string.Empty,
+
+            Url =
+                source.Link ?? string.Empty,
+
+            Remote =
+                ContainsIgnoreCase(
+                    source.Location,
+                    "remote") ||
+                ContainsIgnoreCase(
+                    source.Type,
+                    "remote"),
+
+            Tags =
+                string.IsNullOrWhiteSpace(source.Source)
+                    ? []
+                    : [source.Source],
+
+            JobTypes =
+                string.IsNullOrWhiteSpace(source.Type)
+                    ? []
+                    : [source.Type],
+
+            CreatedAt = ParseDate(source.Updated)
         };
+    }
+
+    private static DateTime? ParseDate(
+        string? value)
+    {
+        if (DateTime.TryParse(
+            value,
+            out DateTime parsedDate))
+        {
+            return parsedDate.ToUniversalTime();
+        }
+
+        return null;
     }
 
     private static bool ContainsIgnoreCase(
@@ -212,96 +195,38 @@ public sealed class JobSearchService
         string searchText)
     {
         return !string.IsNullOrWhiteSpace(value) &&
-            value.Contains(
-                searchText,
-                StringComparison.OrdinalIgnoreCase);
+               value.Contains(
+                   searchText,
+                   StringComparison.OrdinalIgnoreCase);
     }
+}
 
-    private static string StripHtml(
-        string? html)
-    {
-        if (string.IsNullOrWhiteSpace(html))
-        {
-            return string.Empty;
-        }
+public sealed class JoobleResponse
+{
+    public int TotalCount { get; set; }
 
-        string withoutTags =
-            Regex.Replace(
-                html,
-                "<.*?>",
-                " ");
+    public List<JoobleJob> Jobs { get; set; } = [];
+}
 
-        return System.Net.WebUtility
-            .HtmlDecode(withoutTags)
-            .Replace("\r", " ")
-            .Replace("\n", " ")
-            .Trim();
-    }
+public sealed class JoobleJob
+{
+    public string? Id { get; set; }
 
-    private static bool IsProbablyEnglish(
-    ExternalJobListing job)
-    {
-        string combinedText =
-            $"{job.Title} {job.Description}"
-                .ToLowerInvariant();
+    public string? Title { get; set; }
 
-        combinedText = combinedText
-            .Replace(
-                "find more english speaking jobs in germany on arbeitnow",
-                string.Empty)
-            .Replace(
-                "find english speaking jobs in germany on arbeitnow",
-                string.Empty)
-            .Replace(
-                "find jobs in germany on arbeitnow",
-                string.Empty);
+    public string? Location { get; set; }
 
-        string[] strongGermanIndicators =
-        [
-            " aufgaben ",
-        " qualifikation ",
-        " deine aufgaben ",
-        " das bringst du mit ",
-        " wir suchen ",
-        " wir bieten ",
-        " was dich erwartet ",
-        " berufserfahrung ",
-        " deutschkenntnisse ",
-        " bewerbung ",
-        " ausbildung ",
-        " vollzeit ",
-        " teilzeit ",
-        " kenntnisse ",
-        " verantwortung ",
-        " unser team ",
-        " wir freuen uns "
-        ];
+    public string? Company { get; set; }
 
-        string[] strongEnglishIndicators =
-        [
-            " responsibilities ",
-        " requirements ",
-        " qualifications ",
-        " about the role ",
-        " about you ",
-        " your responsibilities ",
-        " what you will do ",
-        " what we offer ",
-        " we are looking for ",
-        " you will ",
-        " join our team ",
-        " apply now "
-        ];
+    public string? Snippet { get; set; }
 
-        int germanScore =
-            strongGermanIndicators.Count(indicator =>
-                combinedText.Contains(indicator));
+    public string? Salary { get; set; }
 
-        int englishScore =
-            strongEnglishIndicators.Count(indicator =>
-                combinedText.Contains(indicator));
+    public string? Source { get; set; }
 
-        return englishScore >= 2 &&
-               germanScore == 0;
-    }
+    public string? Type { get; set; }
+
+    public string? Link { get; set; }
+
+    public string? Updated { get; set; }
 }
