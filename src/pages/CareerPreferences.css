@@ -1,0 +1,428 @@
+* {
+  box-sizing: border-box;
+}
+
+.career-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px 16px;
+  background: #f8f5f5;
+  font-family: "Montserrat", sans-serif;
+}
+
+.career-card {
+  width: min(100%, 620px);
+  padding: 34px 52px 28px;
+  color: #ffffff;
+  background: #980d0d;
+  border-radius: 55px;
+}
+
+.career-progress-section {
+  margin-bottom: 20px;
+}
+
+.career-step {
+  margin: 0 0 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.career-progress-track {
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+}
+
+.career-progress-value {
+  width: 50%;
+  height: 100%;
+  background: #ffffff;
+  border-radius: 999px;
+}
+
+.step-two-progress {
+  width: 100%;
+}
+
+.career-heading h1 {
+  margin: 0;
+  font-size: clamp(27px, 4vw, 35px);
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+.career-heading p {
+  max-width: 500px;
+  margin: 11px 0 23px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.career-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.job-type-section {
+  margin: 0 0 24px;
+  padding: 0;
+  border: none;
+}
+
+.job-type-section legend {
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.job-type-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.job-type-button {
+  min-height: 40px;
+  padding: 8px 18px;
+  color: #202020;
+  background: #ffffff;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.job-type-button:hover {
+  transform: translateY(-2px);
+  border-color: #7df05f;
+}
+
+.job-type-button-selected {
+  border-color: #7df05f;
+  background: #ffffff;
+}
+
+.selected-check {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 5px;
+  color: #ffffff;
+  background: #72ed50;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.career-field {
+  margin-bottom: 18px;
+}
+
+.career-field label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.select-wrapper {
+  position: relative;
+}
+
+.select-wrapper::after {
+  content: "⌄";
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  color: #ffffff;
+  font-size: 19px;
+  pointer-events: none;
+  transform: translateY(-58%);
+}
+
+.career-field select {
+  width: 100%;
+  height: 50px;
+  padding: 0 50px 0 19px;
+  color: #ffffff;
+  background: transparent;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  outline: none;
+  appearance: none;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.career-field select:focus {
+  border-color: #7df05f;
+  box-shadow: 0 0 0 3px rgba(125, 240, 95, 0.22);
+}
+
+.career-field select option {
+  color: #1f1f1f;
+  background: #ffffff;
+}
+
+.career-error {
+  margin: 0 0 15px;
+  padding: 10px 14px;
+  color: #7c0808;
+  background: #ffe8e8;
+  border-radius: 9px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.career-next-button {
+  width: 145px;
+  min-height: 50px;
+  align-self: center;
+  margin-top: 8px;
+  color: #202020;
+  background: #ffffff;
+  border: none;
+  border-radius: 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.career-next-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.career-next-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.career-privacy-note {
+  max-width: 470px;
+  margin: 16px auto 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+/* Step 2 skills section */
+
+.skills-field {
+  position: relative;
+}
+
+.skills-select-button {
+  width: 100%;
+  min-height: 50px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 19px;
+  color: rgba(255, 255, 255, 0.8);
+  background: transparent;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.skills-select-button:focus,
+.skills-select-button-open {
+  border-color: #7df05f;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 240, 95, 0.22);
+}
+
+.skills-arrow {
+  font-size: 19px;
+  transition: transform 0.2s ease;
+}
+
+.skills-arrow-open {
+  transform: rotate(180deg);
+}
+
+.skills-dropdown {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% - 2px);
+  left: 0;
+  width: 100%;
+  max-height: 210px;
+  overflow-y: auto;
+  padding: 9px;
+  color: #202020;
+  background: #ffffff;
+  border: 1px solid #dedede;
+  border-radius: 15px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+}
+
+.skill-checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.skill-checkbox-option:hover {
+  background: #f5eeee;
+}
+
+.skill-checkbox-option input {
+  width: 15px;
+  height: 15px;
+  accent-color: #980d0d;
+  cursor: pointer;
+}
+
+.selected-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.selected-skill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  color: #202020;
+  background: #ffffff;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.selected-skill-tag button {
+  padding: 0;
+  color: #980d0d;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Step 2 navigation buttons */
+
+.onboarding-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 13px;
+  margin-top: 8px;
+}
+
+.onboarding-buttons .career-next-button {
+  align-self: auto;
+  margin-top: 0;
+}
+
+.career-back-button {
+  width: 135px;
+  min-height: 50px;
+  color: #ffffff;
+  background: transparent;
+  border: 2px solid #ffffff;
+  border-radius: 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.career-back-button:hover {
+  color: #980d0d;
+  background: #ffffff;
+  transform: translateY(-2px);
+}
+
+/* Tablet and mobile */
+
+@media (max-width: 700px) {
+  .career-page {
+    align-items: flex-start;
+    padding: 16px 12px;
+  }
+
+  .career-card {
+    width: 100%;
+    padding: 30px 22px 25px;
+    border-radius: 38px;
+  }
+
+  .career-heading h1 {
+    font-size: 27px;
+  }
+
+  .job-type-options {
+    flex-direction: column;
+  }
+
+  .job-type-button {
+    width: 100%;
+  }
+
+  .career-next-button {
+    width: 100%;
+  }
+
+  .onboarding-buttons {
+    flex-direction: column-reverse;
+  }
+
+  .career-back-button,
+  .onboarding-buttons .career-next-button {
+    width: 100%;
+  }
+
+  .skills-dropdown {
+    position: static;
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .career-card {
+    padding: 27px 18px 23px;
+    border-radius: 30px;
+  }
+
+  .career-heading h1 {
+    font-size: 25px;
+  }
+
+  .career-heading p {
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,594 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cv-tailor-screen {
+  width: 100%;
+  min-height: 100vh;
+  background: #5b0707;
+  font-family: "Montserrat", sans-serif;
+}
+
+/* Header */
+
+.cv-tailor-header {
+  width: 100%;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #ececec;
+}
+
+.cv-tailor-logo-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.cv-tailor-logo {
+  width: auto;
+  height: 42px;
+  display: block;
+  object-fit: contain;
+}
+
+/* Main area */
+
+.cv-tailor-body {
+  position: relative;
+  min-height: calc(100vh - 58px);
+  padding: 65px 24px 42px;
+  background: #5b0707;
+}
+
+.cv-tailor-content {
+  width: min(100%, 1080px);
+  margin: 0 auto;
+}
+
+/* Hamburger button */
+
+.cv-tailor-menu-button {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 30;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #ffffff;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.cv-tailor-menu-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Menu overlay */
+
+.cv-tailor-menu-overlay {
+  position: fixed;
+  inset: 58px 0 0;
+  z-index: 19;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
+}
+
+/* Dropdown menu */
+
+.cv-tailor-menu {
+  position: absolute;
+  top: 62px;
+  left: 16px;
+  z-index: 20;
+  width: 230px;
+  padding: 10px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.24);
+}
+
+.cv-tailor-menu button {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 4px;
+  padding: 9px 11px;
+  color: #393939;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.cv-tailor-menu button:last-child {
+  margin-bottom: 0;
+}
+
+.cv-tailor-menu button svg {
+  flex: 0 0 auto;
+  color: #95090c;
+}
+
+.cv-tailor-menu button:hover {
+  color: #95090c;
+  background: #f8e9e9;
+}
+
+.cv-tailor-menu .cv-tailor-menu-active {
+  color: #95090c;
+  background: #f8e9e9;
+}
+
+/* Page heading */
+
+.cv-tailor-heading {
+  margin-bottom: 18px;
+  color: #ffffff;
+  text-align: center;
+}
+
+.cv-tailor-heading h1 {
+  margin: 0;
+  font-size: clamp(27px, 4vw, 39px);
+  line-height: 1.15;
+  letter-spacing: -0.7px;
+}
+
+.cv-tailor-heading p {
+  max-width: 550px;
+  margin: 8px auto 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* Upload card */
+
+.cv-upload-card {
+  width: 100%;
+  padding: 8px;
+  background: #ffffff;
+  border-radius: 13px;
+  box-shadow: 0 12px 26px rgba(35, 0, 0, 0.2);
+}
+
+.cv-upload-inner {
+  min-height: 230px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border: 2px dashed #d4a5a6;
+  border-radius: 9px;
+  text-align: center;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.cv-upload-card-dragging .cv-upload-inner {
+  background: #fff1f1;
+  border-color: #95090c;
+}
+
+.cv-upload-icon-wrapper {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  color: #95090c;
+  background: #f8e9e9;
+  border-radius: 50%;
+}
+
+.cv-upload-icon {
+  display: block;
+}
+
+.cv-upload-inner h2 {
+  max-width: 650px;
+  margin: 14px 0 0;
+  overflow-wrap: anywhere;
+  color: #242424;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.cv-upload-inner p {
+  margin: 6px 0 0;
+  color: #777777;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cv-upload-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 15px;
+}
+
+.cv-upload-button,
+.cv-remove-file-button {
+  min-height: 39px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 17px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cv-upload-button {
+  color: #ffffff;
+  background: #95090c;
+  border: 1px solid #95090c;
+}
+
+.cv-upload-button:hover {
+  background: #760609;
+  border-color: #760609;
+}
+
+.cv-remove-file-button {
+  color: #95090c;
+  background: #ffffff;
+  border: 1px solid #95090c;
+}
+
+.cv-remove-file-button:hover {
+  background: #fff2f2;
+}
+
+.cv-upload-inner small {
+  margin-top: 12px;
+  color: #8a8a8a;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+/* Cards grid */
+
+.cv-tailor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.cv-tailor-card {
+  min-width: 0;
+  padding: 18px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 12px 26px rgba(35, 0, 0, 0.2);
+}
+
+.cv-card-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.cv-card-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  color: #95090c;
+  background: #f8e9e9;
+  border-radius: 8px;
+}
+
+.cv-card-heading h2 {
+  margin: 1px 0 0;
+  color: #242424;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.cv-card-heading p {
+  margin: 5px 0 0;
+  color: #777777;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* Job description */
+
+.cv-tailor-card textarea {
+  width: 100%;
+  min-height: 220px;
+  margin-top: 15px;
+  padding: 13px;
+  resize: vertical;
+  color: #292929;
+  background: #fafafa;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  outline: none;
+  font-size: 11px;
+  line-height: 1.6;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.cv-tailor-card textarea::placeholder {
+  color: #9a9a9a;
+}
+
+.cv-tailor-card textarea:focus {
+  background: #ffffff;
+  border-color: #95090c;
+  box-shadow: 0 0 0 3px rgba(149, 9, 12, 0.1);
+}
+
+.cv-character-count {
+  display: block;
+  margin-top: 7px;
+  color: #888888;
+  font-size: 9px;
+  text-align: right;
+}
+
+/* Preferences */
+
+.cv-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.cv-option {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  color: #3c3c3c;
+  background: #fafafa;
+  border: 1px solid #dedede;
+  border-radius: 7px;
+  text-align: left;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.cv-option:hover {
+  border-color: #c38789;
+  background: #fff6f6;
+}
+
+.cv-option-selected {
+  color: #720609;
+  background: #fff3f3;
+  border-color: #c98c8e;
+}
+
+.cv-option-checkbox {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: grid;
+  place-items: center;
+  color: transparent;
+  background: #ffffff;
+  border: 1px solid #b9b9b9;
+  border-radius: 4px;
+}
+
+.cv-option-checkbox-selected {
+  color: #ffffff;
+  background: #95090c;
+  border-color: #95090c;
+}
+
+/* Status message */
+
+.cv-tailor-status {
+  width: fit-content;
+  max-width: 100%;
+  margin: 13px auto 0;
+  padding: 9px 14px;
+  color: #79070a;
+  background: #ffe8e8;
+  border: 1px solid #e8b8ba;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Bottom buttons */
+
+.cv-tailor-bottom-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 17px;
+}
+
+.cv-tailor-submit-button,
+.cv-tailor-reset-button {
+  min-height: 43px;
+  padding: 0 24px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cv-tailor-submit-button {
+  min-width: 165px;
+  color: #95090c;
+  background: #ffffff;
+  border: 1px solid #ffffff;
+  box-shadow: 0 7px 17px rgba(30, 0, 0, 0.18);
+}
+
+.cv-tailor-submit-button:hover {
+  background: #f8e9e9;
+}
+
+.cv-tailor-reset-button {
+  color: #ffffff;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.cv-tailor-reset-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Tablet */
+
+@media (max-width: 850px) {
+  .cv-tailor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cv-tailor-card textarea {
+    min-height: 190px;
+  }
+}
+
+/* Mobile */
+
+@media (max-width: 650px) {
+  .cv-tailor-body {
+    padding: 65px 12px 28px;
+  }
+
+  .cv-tailor-menu-button {
+    top: 10px;
+    left: 8px;
+  }
+
+  .cv-tailor-menu {
+    top: 58px;
+    left: 10px;
+    width: min(230px, calc(100% - 20px));
+  }
+
+  .cv-tailor-heading {
+    margin-bottom: 14px;
+  }
+
+  .cv-tailor-heading h1 {
+    font-size: 27px;
+  }
+
+  .cv-tailor-heading p {
+    font-size: 10.5px;
+  }
+
+  .cv-upload-inner {
+    min-height: 215px;
+    padding: 21px 14px;
+  }
+
+  .cv-upload-inner h2 {
+    font-size: 14px;
+  }
+
+  .cv-upload-actions {
+    flex-wrap: wrap;
+  }
+
+  .cv-tailor-card {
+    padding: 15px;
+  }
+
+  .cv-options-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cv-option {
+    min-height: 40px;
+    font-size: 10px;
+  }
+
+  .cv-tailor-bottom-actions {
+    width: 100%;
+  }
+
+  .cv-tailor-submit-button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* Small phones */
+
+@media (max-width: 380px) {
+  .cv-tailor-logo {
+    height: 39px;
+  }
+
+  .cv-tailor-heading h1 {
+    font-size: 24px;
+  }
+
+  .cv-tailor-bottom-actions {
+    flex-direction: column-reverse;
+  }
+
+  .cv-tailor-submit-button,
+  .cv-tailor-reset-button {
+    width: 100%;
+  }
+}

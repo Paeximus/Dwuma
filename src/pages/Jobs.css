@@ -1,0 +1,57 @@
+.jobs-page {
+  --jobs-red: #ba1117;
+  --jobs-muted: #705c5e;
+  width: 100%;
+  min-height: calc(100vh - 147px);
+  padding: 27px 0 58px;
+  color: #302729;
+}
+
+.jobs-page-heading { margin-bottom: 39px; }
+.jobs-page-heading h1 { margin: 0 0 10px; color: var(--jobs-red); font-size: 40px; font-weight: 750; line-height: 1.1; }
+.jobs-page-heading p { margin: 0; color: var(--jobs-muted); font-size: 16px; }
+
+.jobs-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 212px 212px 58px;
+  gap: 18px;
+  align-items: center;
+  padding: 25px;
+  border: 1px solid #eedddd;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.jobs-search-field { position: relative; display: flex; align-items: center; }
+.jobs-search-field svg { position: absolute; right: 18px; color: #807273; pointer-events: none; }
+.jobs-filter-bar input, .jobs-filter-bar select, .jobs-results-toolbar select {
+  width: 100%; height: 55px; border: 1px solid #e4dada; border-radius: 10px; padding: 0 18px; outline: none; background: #fff; color: #4f4243; font: inherit; font-size: 14px;
+}
+.jobs-filter-bar input { padding-right: 54px; }
+.jobs-filter-bar input::placeholder { color: #665a5b; opacity: 1; }
+.jobs-filter-bar input:focus, .jobs-filter-bar select:focus, .jobs-results-toolbar select:focus { border-color: #c46468; box-shadow: 0 0 0 3px rgba(186, 17, 23, 0.08); }
+.jobs-filter-button { display: grid; width: 58px; height: 55px; place-items: center; border: 1px solid #e4dada; border-radius: 10px; background: #fff; color: #665859; cursor: pointer; }
+.jobs-filter-button:hover { color: var(--jobs-red); border-color: #c46468; }
+
+.jobs-results-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 30px 0 19px; }
+.jobs-results-toolbar p { margin: 0; color: #745b5d; font-size: 14px; }
+.jobs-results-toolbar select { width: 197px; height: 47px; }
+
+.jobs-page-empty { min-height: 340px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed #e9cdce; border-radius: 16px; background: rgba(255,255,255,.72); text-align: center; }
+.jobs-empty-icon { display: grid; width: 64px; height: 64px; place-items: center; border-radius: 50%; background: #fdebec; color: var(--jobs-red); }
+.jobs-page-empty h2 { margin: 19px 0 11px; color: #bd6669; font-size: 21px; font-weight: 700; }
+.jobs-page-empty p { margin: 0; color: #80696b; font-size: 15px; }
+
+.jobs-results-list { display: grid; gap: 12px; }
+.jobs-result-card { display: grid; grid-template-columns: 52px minmax(0,1fr) auto; align-items: center; gap: 16px; padding: 20px; border: 1px solid #eadadb; border-radius: 14px; background: #fff; }
+.jobs-company-mark { display: grid; width: 52px; height: 52px; place-items: center; border-radius: 11px; background: #fdebec; color: var(--jobs-red); }
+.jobs-result-copy h2 { margin: 0; color: #742024; font-size: 17px; }
+.jobs-company-name { margin: 5px 0 9px; color: #67585a; font-size: 14px; }
+.jobs-result-meta { display: flex; flex-wrap: wrap; gap: 17px; color: #887779; font-size: 12px; }
+.jobs-result-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.jobs-result-card > a { border-radius: 9px; padding: 11px 16px; background: var(--jobs-red); color: #fff; font-size: 13px; font-weight: 650; text-decoration: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+
+@media (max-width: 1050px) { .jobs-filter-bar { grid-template-columns: minmax(240px, 1fr) 170px 170px 58px; } }
+@media (max-width: 760px) { .jobs-page { padding-top: 10px; } .jobs-page-heading { margin-bottom: 25px; } .jobs-page-heading h1 { font-size: 32px; } .jobs-filter-bar { grid-template-columns: 1fr 1fr 58px; } .jobs-search-field { grid-column: 1 / -1; } }
+@media (max-width: 520px) { .jobs-filter-bar { grid-template-columns: 1fr 58px; padding: 16px; gap: 12px; } .jobs-filter-bar select { grid-column: 1 / -1; } .jobs-filter-button { grid-column: 2; grid-row: 4; } .jobs-results-toolbar { align-items: stretch; flex-direction: column; } .jobs-results-toolbar select { width: 100%; } .jobs-page-empty { min-height: 300px; padding: 25px; } .jobs-result-card { grid-template-columns: 46px 1fr; } .jobs-result-card > a { grid-column: 1 / -1; text-align: center; } }

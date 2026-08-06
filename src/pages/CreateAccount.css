@@ -1,0 +1,274 @@
+.create-account-page {
+  width: 100%;
+  min-height: 100vh;
+  background: #f8eeee;
+  font-family: "Montserrat", Arial, sans-serif;
+}
+
+.create-account-layout {
+  width: 100%;
+  min-height: 100vh;
+  padding: 20px 24px 20px 38px;
+  display: grid;
+  grid-template-columns: 52% 48%;
+  gap: 30px;
+}
+
+/* LEFT SECTION */
+
+.create-account-illustration {
+  position: relative;
+  min-height: calc(100vh - 40px);
+  padding: 30px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-account-logo-link {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  display: block;
+}
+
+.create-account-logo {
+  width: 100px;
+  height: auto;
+  display: block;
+}
+
+.create-account-image {
+  width: min(1000px, 96%);
+  height: auto;
+  display: block;
+  object-fit: contain;
+  
+  transform: scale(1.1) translateX(50px) translateY(69px);
+}
+
+
+/* RIGHT CARD */
+
+.create-account-panel {
+  width: 100%;
+  min-height: calc(100vh - 40px);
+  padding: 42px 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  background: #9f1111;
+  border-radius: 20px;
+  box-shadow: 3px 4px 5px rgba(0, 0, 0, 0.18);
+}
+
+.create-account-form-wrapper {
+  width: 100%;
+  max-width: 350px;
+  transform: translateY(-10px);
+}
+
+.create-account-header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.create-account-header h1 {
+  margin: 0 0 20px;
+  color: #ffffff;
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.create-account-header p {
+  margin: 0;
+  color: #ffffff;
+  font-size: 13px;
+}
+
+/* FORM */
+
+.create-account-form {
+  width: 100%;
+}
+
+.create-account-group {
+  margin-bottom: 19px;
+}
+
+.create-account-group label {
+  display: block;
+  margin: 0 0 8px 4px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.create-account-group input {
+  width: 100%;
+  height: 52px;
+  padding: 0 20px;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  background: transparent;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  outline: none;
+}
+
+.create-account-group input::placeholder {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.create-account-group input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.14);
+}
+
+/* PASSWORD */
+
+.create-password-wrapper {
+  position: relative;
+}
+
+.create-password-wrapper input {
+  padding-right: 68px;
+}
+
+.create-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  padding: 4px;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 11px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+/* ERROR */
+
+.create-account-error {
+  margin: 8px 0 0;
+  padding: 11px 14px;
+  color: #8b0909;
+  font-size: 12px;
+  text-align: center;
+  background: #ffffff;
+  border-radius: 8px;
+}
+
+/* BUTTON */
+
+.create-account-button {
+  width: 140px;
+  height: 50px;
+  margin: 28px auto 0;
+  display: block;
+  color: #222222;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  background: #ffffff;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.18);
+}
+
+.create-account-button:hover {
+  transform: translateY(-1px);
+}
+
+.create-account-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.create-account-login-text {
+  margin: 26px 0 0;
+  color: #ffffff;
+  font-size: 11px;
+  text-align: center;
+}
+
+.create-account-login-text a {
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* TABLET */
+
+@media (max-width: 900px) {
+  .create-account-layout {
+    padding: 20px;
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  .create-account-illustration {
+    min-height: 420px;
+  }
+
+  .create-account-image {
+    width: min(430px, 86%);
+  }
+
+  .create-account-panel {
+    min-height: auto;
+    padding: 55px 34px;
+  }
+
+  .create-account-form-wrapper {
+    max-width: 440px;
+    transform: none;
+  }
+}
+
+/* MOBILE */
+
+@media (max-width: 520px) {
+  .create-account-layout {
+    padding: 0;
+    gap: 0;
+  }
+
+  .create-account-illustration {
+    min-height: 315px;
+    padding: 24px 20px;
+  }
+
+  .create-account-logo-link {
+    top: 20px;
+    left: 20px;
+  }
+
+  .create-account-logo {
+    width: 95px;
+  }
+
+  .create-account-image {
+    width: min(300px, 88%);
+    margin-top: 42px;
+  }
+
+  .create-account-panel {
+    padding: 44px 24px;
+    border-radius: 26px 26px 0 0;
+    box-shadow: none;
+  }
+
+  .create-account-header h1 {
+    font-size: 30px;
+  }
+
+  .create-account-group input {
+    height: 50px;
+  }
+}
