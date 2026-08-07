@@ -58,7 +58,7 @@ public sealed class AuthService
 
         var user = new User
         {
-            FullName = string.Empty,
+            FullName = request.Username.Trim(),
             Email = email.Trim().ToLowerInvariant(),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -128,6 +128,7 @@ public sealed class AuthService
         {
             Message ="Account created. Check your email to verify your account.",
 
+            Username = user.FullName,
             Email = user.Email
         };
 

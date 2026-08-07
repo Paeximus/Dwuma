@@ -1634,10 +1634,16 @@
       "RegisterRequest": {
         "required": [
           "email",
-          "password"
+          "password",
+          "username"
         ],
         "type": "object",
         "properties": {
+          "username": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
           "email": {
             "maxLength": 255,
             "minLength": 0,
