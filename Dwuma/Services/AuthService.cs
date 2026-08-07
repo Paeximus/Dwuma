@@ -70,6 +70,11 @@ public sealed class AuthService
             OnboardingCompletedAt = null,
 
         };
+        if (string.IsNullOrWhiteSpace(request.Username))
+        {
+            throw new ArgumentException(
+                "Username is required.");
+        }
 
         user.PasswordHash =
             _passwordHasher.HashPassword(
@@ -106,11 +111,29 @@ public sealed class AuthService
             $"&email={Uri.EscapeDataString(user.Email)}";
 
 
-        await _emailService
-            .SendVerificationEmailAsync(
+        bool verificationEmailSent = false;
+
+        try
+        {
+            _logger.LogInformation(
+                "Sending verification email to {Email}.",
+                user.Email);
+
+
+            await _emailService.SendVerificationEmailAsync(
                 user.Email,
                 verificationLink,
                 cancellationToken);
+
+            verificationEmailSent = true;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Account {Email} was created, but its verification email could not be sent.",
+                user.Email);
+        }
 
 
         _logger.LogInformation(
@@ -126,10 +149,16 @@ public sealed class AuthService
 
         return new RegisterResponse
         {
-            Message ="Account created. Check your email to verify your account.",
-
             Username = user.FullName,
-            Email = user.Email
+            Email = user.Email,
+
+            VerificationEmailSent =
+        verificationEmailSent,
+
+            Message =
+        verificationEmailSent
+            ? "Account created. Check your email to verify your account."
+            : "Account created, but the verification email could not be sent. Use resend verification."
         };
 
     }

@@ -22,6 +22,8 @@ public sealed class EmailService : IEmailService
         string verificationLink,
         CancellationToken cancellationToken = default)
     {
+
+
         string host =
             _configuration["Email:Host"]
             ?? throw new InvalidOperationException(
@@ -108,8 +110,19 @@ public sealed class EmailService : IEmailService
 
         using var smtpClient = new SmtpClient
         {
-            CheckCertificateRevocation = false
+            CheckCertificateRevocation = false,
+            Timeout = 30000 // 30 seconds
         };
+
+        using var timeoutSource =
+            CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken);
+
+                timeoutSource.CancelAfter(
+                    TimeSpan.FromSeconds(30));
+
+                CancellationToken emailCancellationToken =
+                    timeoutSource.Token;
 
         await smtpClient.ConnectAsync(
             host,
