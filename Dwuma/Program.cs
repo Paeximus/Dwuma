@@ -9,6 +9,7 @@ using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text;
 using System.Threading.RateLimiting;
+using Resend;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -299,6 +300,22 @@ builder.Services.AddHttpClient<CareerjetJobService>(
             TimeSpan.FromSeconds(30);
     });
 
+builder.Services.AddOptions();
+
+builder.Services.AddHttpClient<ResendClient>();
+
+builder.Services.Configure<ResendClientOptions>(
+    options =>
+    {
+        options.ApiToken =
+            builder.Configuration["Resend:ApiKey"]
+            ?? throw new InvalidOperationException(
+                "Resend API key is not configured.");
+    });
+
+builder.Services.AddTransient<
+    IResend,
+    ResendClient>();
 
 var app = builder.Build();
 

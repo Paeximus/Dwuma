@@ -1,18 +1,19 @@
-﻿using MailKit.Net.Smtp;
-using MailKit.Security;
-using MimeKit;
+﻿using Resend;
 
 namespace Dwuma.Services;
 
 public sealed class EmailService : IEmailService
 {
+    private readonly IResend _resend;
     private readonly IConfiguration _configuration;
     private readonly ILogger<EmailService> _logger;
 
     public EmailService(
+        IResend resend,
         IConfiguration configuration,
         ILogger<EmailService> logger)
     {
+        _resend = resend;
         _configuration = configuration;
         _logger = logger;
     }
@@ -22,129 +23,165 @@ public sealed class EmailService : IEmailService
         string verificationLink,
         CancellationToken cancellationToken = default)
     {
-
-
-        string host =
-            _configuration["Email:Host"]
-            ?? throw new InvalidOperationException(
-                "Email host is not configured.");
-
-        int port =
-            int.TryParse(
-                _configuration["Email:Port"],
-                out int configuredPort)
-                ? configuredPort
-                : 587;
-
-        string username =
-            _configuration["Email:Username"]
-            ?? throw new InvalidOperationException(
-                "Email username is not configured.");
-
-        string password =
-            _configuration["Email:Password"]
-            ?? throw new InvalidOperationException(
-                "Email password is not configured.");
-
         string fromEmail =
             _configuration["Email:FromEmail"]
-            ?? username;
+            ?? throw new InvalidOperationException(
+                "Email sender address is not configured.");
 
         string fromName =
             _configuration["Email:FromName"]
             ?? "DWUMA";
 
-        var message = new MimeMessage();
-
-        message.From.Add(
-            new MailboxAddress(
-                fromName,
-                fromEmail));
-
-        message.To.Add(
-            MailboxAddress.Parse(
-                recipientEmail));
-
-        message.Subject =
-            "Verify your DWUMA email address";
-
-        var bodyBuilder = new BodyBuilder
+        var message = new EmailMessage
         {
-            HtmlBody = $"""
-                <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;">
-                    <h2>Verify your email address</h2>
+            From =
+                $"{fromName} <{fromEmail}>",
 
-                    <p>
-                        Thank you for creating a DWUMA account.
-                        Click the button below to verify your email.
-                    </p>
+            Subject =
+                "Verify your DWUMA email address",
 
-                    <p style="margin:30px 0;">
-                        <a
-                            href="{verificationLink}"
-                            style="
-                                background:#850808;
-                                color:white;
-                                padding:12px 22px;
-                                border-radius:24px;
-                                text-decoration:none;
-                                display:inline-block;
-                            ">
-                            Verify email
-                        </a>
-                    </p>
-
-                    <p>
-                        This link expires in 30 minutes.
-                    </p>
-
-                    <p>
-                        If you did not create this account,
-                        you can ignore this email.
-                    </p>
-                </div>
-                """
+            HtmlBody = BuildVerificationHtml(
+                verificationLink)
         };
 
-        message.Body = bodyBuilder.ToMessageBody();
+        message.To.Add(recipientEmail);
 
-        using var smtpClient = new SmtpClient
+        try
         {
-            CheckCertificateRevocation = false,
-            Timeout = 30000 // 30 seconds
-        };
+            var response =
+                await _resend.EmailSendAsync(
+                    message,
+                    cancellationToken);
 
-        using var timeoutSource =
-            CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken);
+            _logger.LogInformation(
+                "Verification email sent to {Email}. Resend ID: {EmailId}",
+                recipientEmail,
+                response.Content);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Resend email delivery failed for {Email}.",
+                recipientEmail);
 
-                timeoutSource.CancelAfter(
-                    TimeSpan.FromSeconds(30));
+            throw;
+        }
+    }
 
-                CancellationToken emailCancellationToken =
-                    timeoutSource.Token;
+    private static string BuildVerificationHtml(
+        string verificationLink)
+    {
+        string safeLink =
+            System.Net.WebUtility.HtmlEncode(
+                verificationLink);
 
-        await smtpClient.ConnectAsync(
-            host,
-            port,
-            SecureSocketOptions.StartTls,
-            cancellationToken);
+        return $"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta
+                    name="viewport"
+                    content="width=device-width, initial-scale=1.0">
+                <title>Verify your email</title>
+            </head>
 
-        await smtpClient.AuthenticateAsync(
-            username,
-            password,
-            cancellationToken);
+            <body style="
+                margin:0;
+                padding:0;
+                background:#f8f5f5;
+                font-family:Arial,sans-serif;
+                color:#222;
+            ">
+                <table
+                    role="presentation"
+                    width="100%"
+                    cellspacing="0"
+                    cellpadding="0"
+                    style="padding:40px 16px;">
+                    <tr>
+                        <td align="center">
+                            <table
+                                role="presentation"
+                                width="100%"
+                                cellspacing="0"
+                                cellpadding="0"
+                                style="
+                                    max-width:600px;
+                                    background:#ffffff;
+                                    border-radius:16px;
+                                    padding:40px;
+                                ">
+                                <tr>
+                                    <td>
+                                        <h1 style="
+                                            margin:0 0 20px;
+                                            color:#850808;
+                                            font-size:28px;
+                                        ">
+                                            Verify your email
+                                        </h1>
 
-        await smtpClient.SendAsync(
-            message,
-            cancellationToken);
+                                        <p style="
+                                            font-size:16px;
+                                            line-height:1.6;
+                                        ">
+                                            Thank you for creating a
+                                            DWUMA account.
+                                        </p>
 
-        await smtpClient.DisconnectAsync(
-            true,
-            cancellationToken);
+                                        <p style="
+                                            font-size:16px;
+                                            line-height:1.6;
+                                        ">
+                                            Verify your email address
+                                            to continue to onboarding.
+                                        </p>
 
-        _logger.LogInformation(
-            "Verification email sent to {Email}.",
-            recipientEmail);
+                                        <p style="
+                                            margin:32px 0;
+                                        ">
+                                            <a
+                                                href="{safeLink}"
+                                                style="
+                                                    display:inline-block;
+                                                    background:#850808;
+                                                    color:#ffffff;
+                                                    padding:14px 24px;
+                                                    border-radius:999px;
+                                                    text-decoration:none;
+                                                    font-weight:600;
+                                                ">
+                                                Verify email
+                                            </a>
+                                        </p>
+
+                                        <p style="
+                                            font-size:14px;
+                                            color:#666;
+                                            line-height:1.6;
+                                        ">
+                                            This link expires in
+                                            30 minutes.
+                                        </p>
+
+                                        <p style="
+                                            font-size:14px;
+                                            color:#666;
+                                            line-height:1.6;
+                                        ">
+                                            If you did not create this
+                                            account, ignore this email.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
+            """;
     }
 }
