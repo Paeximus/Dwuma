@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Dwuma.Models.Enums;
+using System;
 using System.Collections.Generic;
 
 namespace Dwuma.Models.Data.DwumaContext;
@@ -34,6 +35,19 @@ public partial class User
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
     public virtual Profile? Profile { get; set; }
+
+    public bool IsEmailVerified { get; set; }
+
+    public DateTime? EmailVerifiedAt { get; set; }
+
+    public string? EmailVerificationTokenHash { get; set; }
+
+    public DateTime? EmailVerificationExpiresAt { get; set; }
+
+    public OnboardingStatus OnboardingStatus { get; set; }
+        = OnboardingStatus.NotStarted;
+
+    public DateTime? OnboardingCompletedAt { get; set; }
 
     public virtual ICollection<SkillGapReport> SkillGapReports { get; set; } = new List<SkillGapReport>();
 

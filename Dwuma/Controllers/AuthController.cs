@@ -1,10 +1,11 @@
-﻿using Dwuma.Models.Authentication;
+﻿using Dwuma.Extensions;
+using Dwuma.Models.Auth;
+using Dwuma.Models.Authentication;
 using Dwuma.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
-using Dwuma.Extensions;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
 
 namespace Dwuma.Controllers;
 
@@ -40,8 +41,9 @@ public sealed class AuthController : ControllerBase
     {
         try
         {
-            AuthResponse response =
-                await _authService.RegisterAsync(
+            RegisterResponse response =
+                await _authService.RegisterAsync
+                (
                     request,
                     cancellationToken);
 
@@ -121,4 +123,41 @@ public sealed class AuthController : ControllerBase
         });
     }
 
+    [AllowAnonymous]
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail(
+    [FromBody] VerifyEmailRequest request,
+    CancellationToken cancellationToken)
+    {
+        await _authService.VerifyEmailAsync(
+            request,
+            cancellationToken);
+
+        return Ok(new
+        {
+            message =
+                "Email verified successfully.",
+
+            nextRoute =
+                "/onboarding/step-1"
+        });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("resend-verification")]
+    public async Task<IActionResult> ResendVerification(
+    [FromBody] ResendVerificationRequest request,
+    CancellationToken cancellationToken)
+    {
+        await _authService
+            .ResendVerificationEmailAsync(
+                request.Email,
+                cancellationToken);
+
+        return Ok(new
+        {
+            message =
+                "If the account exists and is not verified, a new verification email has been sent."
+        });
+    }
 }

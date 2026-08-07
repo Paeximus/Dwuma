@@ -1,6 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Dwuma.Models.Enums;
 using Microsoft.EntityFrameworkCore;
+using Dwuma.Models.Enums;
+using System;
+using System.Collections.Generic;
 
 namespace Dwuma.Models.Data.DwumaContext;
 
@@ -47,7 +49,7 @@ public partial class DwumaContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.AppliedAt)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnName("applied_at");
             entity.Property(e => e.AutoSubmitted)
                 .HasDefaultValue(false)
@@ -55,7 +57,7 @@ public partial class DwumaContext : DbContext
             entity.Property(e => e.CvDocumentId).HasColumnName("cv_document_id");
             entity.Property(e => e.JobListingId).HasColumnName("job_listing_id");
             entity.Property(e => e.LastUpdated)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
                 .HasColumnName("last_updated");
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
@@ -89,7 +91,7 @@ public partial class DwumaContext : DbContext
                 .HasColumnType("text")
                 .HasColumnName("changelog");
             entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnName("created_at");
             entity.Property(e => e.FileName)
                 .HasMaxLength(255)
@@ -165,7 +167,7 @@ public partial class DwumaContext : DbContext
                 .IsUnicode(false)
                 .HasColumnName("role");
             entity.Property(e => e.StartedAt)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnName("started_at");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
@@ -215,7 +217,7 @@ public partial class DwumaContext : DbContext
                 .HasColumnType("text")
                 .HasColumnName("description");
             entity.Property(e => e.DiscoveredAt)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnName("discovered_at");
             entity.Property(e => e.JobType)
                 .HasMaxLength(100)
@@ -286,7 +288,7 @@ public partial class DwumaContext : DbContext
             entity.Property(e => e.HourOfDay).HasColumnName("hour_of_day");
             entity.Property(e => e.NotificationId).HasColumnName("notification_id");
             entity.Property(e => e.RecordedAt)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnName("recorded_at");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
@@ -345,7 +347,7 @@ public partial class DwumaContext : DbContext
                 .IsUnicode(false)
                 .HasColumnName("salary_expectation");
             entity.Property(e => e.UpdatedAt)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnName("updated_at");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
@@ -362,7 +364,7 @@ public partial class DwumaContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.AddedAt)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnName("added_at");
             entity.Property(e => e.ProficiencyLevel)
                 .HasMaxLength(50)
@@ -429,7 +431,7 @@ public partial class DwumaContext : DbContext
                 .IsUnicode(false)
                 .HasColumnName("career_path");
             entity.Property(e => e.GeneratedAt)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnName("generated_at");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
@@ -448,8 +450,14 @@ public partial class DwumaContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getdate())")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
                 .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("updated_at");
             entity.Property(e => e.Email)
                 .HasMaxLength(255)
                 .IsUnicode(false)
@@ -466,9 +474,30 @@ public partial class DwumaContext : DbContext
                 .HasMaxLength(255)
                 .IsUnicode(false)
                 .HasColumnName("password_hash");
-            entity.Property(e => e.UpdatedAt)
-                .HasDefaultValueSql("(getdate())")
-                .HasColumnName("updated_at");
+            
+            entity.Property(e => e.IsEmailVerified)
+                .HasColumnName("is_email_verified")
+                .HasDefaultValue(false);
+
+            entity.Property(e => e.EmailVerifiedAt)
+                .HasColumnName("email_verified_at");
+
+            entity.Property(e => e.OnboardingStatus)
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .HasColumnName("onboarding_status")
+                .HasDefaultValue(OnboardingStatus.NotStarted);
+
+            entity.Property(e => e.OnboardingCompletedAt)
+                .HasColumnName("onboarding_completed_at");
+
+            entity.Property(e => e.EmailVerificationTokenHash)
+                .HasColumnName("email_verification_token_hash")
+                .HasMaxLength(128);
+
+            entity.Property(e => e.EmailVerificationExpiresAt)
+                .HasColumnName("email_verification_expires_at")
+                .HasColumnType("datetime");
         });
 
         OnModelCreatingPartial(modelBuilder);

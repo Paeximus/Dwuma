@@ -84,9 +84,43 @@ string connectionString =
         "Connection string 'DefaultConnection' was not found.");
 
 builder.Services.AddDbContext<DwumaContext>(options =>
+{
     options.UseMySql(
-            connectionString,
-            ServerVersion.AutoDetect(connectionString)));
+        connectionString,
+        new MySqlServerVersion(
+            new Version(8, 0, 36)),
+        mysqlOptions =>
+        {
+            mysqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorNumbersToAdd: null);
+        });
+});
+
+var connectionInfo =
+    new MySqlConnector.MySqlConnectionStringBuilder(
+        connectionString);
+
+Console.WriteLine(
+    $"MySQL server: {connectionInfo.Server}");
+
+Console.WriteLine(
+    $"MySQL port: {connectionInfo.Port}");
+
+Console.WriteLine(
+    $"MySQL database: {connectionInfo.Database}");
+
+Console.WriteLine(
+    $"MySQL username: {connectionInfo.UserID}");
+
+Console.WriteLine(
+    $"SSL mode: {connectionInfo.SslMode}");
+
+Console.WriteLine(
+    $"Password configured: " +
+    $"{!string.IsNullOrWhiteSpace(connectionInfo.Password)}");
+
 
 builder.Services.AddHttpClient<GeminiService>(client =>
 {
@@ -113,6 +147,7 @@ builder.Services.AddScoped<InterviewCoachService>();
 builder.Services.AddScoped<JobMatchService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 string[] allowedOrigins =
     builder.Configuration
