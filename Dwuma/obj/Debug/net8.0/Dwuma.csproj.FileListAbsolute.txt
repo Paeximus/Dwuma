@@ -12,7 +12,6 @@ D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\DocumentFormat.OpenXml.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\DocumentFormat.OpenXml.Framework.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Humanizer.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
-D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.AspNetCore.WebUtilities.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.Bcl.AsyncInterfaces.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.CodeAnalysis.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.CodeAnalysis.CSharp.dll
@@ -35,7 +34,6 @@ D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.IdentityModel.Logging.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.IdentityModel.Tokens.dll
-D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.Net.Http.Headers.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Microsoft.OpenApi.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Mono.TextTemplating.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\MySqlConnector.dll
@@ -47,7 +45,6 @@ D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\UglyToad.PdfPig.Tokenization.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\UglyToad.PdfPig.Tokens.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\UglyToad.PdfPig.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Pomelo.EntityFrameworkCore.MySql.dll
-D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Resend.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
