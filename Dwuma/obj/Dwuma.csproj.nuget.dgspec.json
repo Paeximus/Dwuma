@@ -83,10 +83,6 @@
               "target": "Package",
               "version": "[8.0.3, )"
             },
-            "Resend": {
-              "target": "Package",
-              "version": "[0.8.0, )"
-            },
             "Swashbuckle.AspNetCore": {
               "target": "Package",
               "version": "[6.6.2, )"

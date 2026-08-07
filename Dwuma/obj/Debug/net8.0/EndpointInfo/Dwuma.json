@@ -1839,39 +1839,20 @@
         "additionalProperties": false
       },
       "SkillsGapRequest": {
-        "required": [
-          "jobTitle",
-          "skills"
-        ],
         "type": "object",
         "properties": {
           "skills": {
             "type": "array",
             "items": {
               "type": "string"
-            }
-          },
-          "education": {
-            "type": "string",
+            },
             "nullable": true
           },
           "fieldOfStudy": {
             "type": "string",
             "nullable": true
           },
-          "experience": {
-            "type": "string",
-            "nullable": true
-          },
           "jobTitle": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "industry": {
-            "type": "string",
-            "nullable": true
-          },
-          "jobDescription": {
             "type": "string",
             "nullable": true
           }

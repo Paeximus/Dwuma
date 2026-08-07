@@ -34,7 +34,7 @@ public sealed class JwtTokenService
         int expiryMinutes =
             _configuration.GetValue(
                 "Jwt:ExpiryMinutes",
-                120);
+                10080);
 
         DateTime expiresAt =
             DateTime.UtcNow.AddMinutes(

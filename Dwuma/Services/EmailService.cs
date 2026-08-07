@@ -1,19 +1,20 @@
-﻿using Resend;
+﻿using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Dwuma.Services;
 
 public sealed class EmailService : IEmailService
 {
-    private readonly IResend _resend;
+    private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<EmailService> _logger;
 
     public EmailService(
-        IResend resend,
+        HttpClient httpClient,
         IConfiguration configuration,
         ILogger<EmailService> logger)
     {
-        _resend = resend;
+        _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger;
     }
@@ -23,6 +24,11 @@ public sealed class EmailService : IEmailService
         string verificationLink,
         CancellationToken cancellationToken = default)
     {
+        string apiKey =
+            _configuration["Brevo:ApiKey"]
+            ?? throw new InvalidOperationException(
+                "Brevo API key is not configured.");
+
         string fromEmail =
             _configuration["Email:FromEmail"]
             ?? throw new InvalidOperationException(
@@ -32,41 +38,69 @@ public sealed class EmailService : IEmailService
             _configuration["Email:FromName"]
             ?? "DWUMA";
 
-        var message = new EmailMessage
+        var payload = new
         {
-            From =
-                $"{fromName} <{fromEmail}>",
+            sender = new
+            {
+                name = fromName,
+                email = fromEmail
+            },
 
-            Subject =
+            to = new[]
+            {
+                new
+                {
+                    email = recipientEmail
+                }
+            },
+
+            subject =
                 "Verify your DWUMA email address",
 
-            HtmlBody = BuildVerificationHtml(
-                verificationLink)
+            htmlContent =
+                BuildVerificationHtml(
+                    verificationLink)
         };
 
-        message.To.Add(recipientEmail);
+        using var request =
+            new HttpRequestMessage(
+                HttpMethod.Post,
+                "https://api.brevo.com/v3/smtp/email");
 
-        try
-        {
-            var response =
-                await _resend.EmailSendAsync(
-                    message,
-                    cancellationToken);
+        request.Headers.Add(
+            "api-key",
+            apiKey);
 
-            _logger.LogInformation(
-                "Verification email sent to {Email}. Resend ID: {EmailId}",
-                recipientEmail,
-                response.Content);
-        }
-        catch (Exception exception)
+        request.Headers.Add(
+            "accept",
+            "application/json");
+
+        request.Content =
+            JsonContent.Create(payload);
+
+        using HttpResponseMessage response =
+            await _httpClient.SendAsync(
+                request,
+                cancellationToken);
+
+        string responseBody =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
         {
             _logger.LogError(
-                exception,
-                "Resend email delivery failed for {Email}.",
-                recipientEmail);
+                "Brevo email failed. Status: {StatusCode}. Response: {Response}",
+                response.StatusCode,
+                responseBody);
 
-            throw;
+            throw new InvalidOperationException(
+                $"Brevo email delivery failed with HTTP {(int)response.StatusCode}.");
         }
+
+        _logger.LogInformation(
+            "Verification email sent successfully to {Email}.",
+            recipientEmail);
     }
 
     private static string BuildVerificationHtml(
@@ -155,15 +189,6 @@ public sealed class EmailService : IEmailService
                                                 ">
                                                 Verify email
                                             </a>
-                                        </p>
-
-                                        <p style="
-                                            font-size:14px;
-                                            color:#666;
-                                            line-height:1.6;
-                                        ">
-                                            This link expires in
-                                            30 minutes.
                                         </p>
 
                                         <p style="
