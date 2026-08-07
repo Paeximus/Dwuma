@@ -76,15 +76,20 @@ public sealed class InterviewCoachService
     }
 
     private static void ValidateQuestionRequest(
-        InterviewQuestionRequest request)
+    InterviewQuestionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (string.IsNullOrWhiteSpace(request.JobTitle))
+        if (string.IsNullOrWhiteSpace(
+                request.JobTitle))
         {
             throw new ArgumentException(
                 "The job title is required.");
         }
+
+        ValidateInterviewSafety(
+            request.JobTitle,
+            request.JobDescription);
     }
 
     private static void ValidateAnswerRequest(
@@ -104,6 +109,73 @@ public sealed class InterviewCoachService
             throw new ArgumentException(
                 "The candidate answer is required.");
         }
+        ValidateInterviewSafety(request.JobTitle, request.JobDescription);
+    }
+
+    private static void ValidateInterviewSafety(
+    string? jobTitle,
+    string? jobDescription = null)
+    {
+        string combined =
+            $"{jobTitle} {jobDescription}"
+                .Trim()
+                .ToLowerInvariant();
+
+        string[] prohibitedTerms =
+        [
+            // Illegal drug production / trafficking
+            "meth production",
+        "meth producer",
+        "meth manufacturer",
+        "meth lab",
+        "cook meth",
+        "cocaine production",
+        "cocaine manufacturer",
+        "drug trafficking",
+        "drug trafficker",
+        "illegal drug manufacturing",
+
+        // Violence / murder-for-hire
+        "hitman",
+        "contract killer",
+        "assassin for hire",
+        "murder for hire",
+
+        // Human trafficking
+        "human trafficker",
+        "human trafficking",
+        "sex trafficking",
+
+        // Illegal weapons / explosives
+        "bomb maker",
+        "bomb making",
+        "illegal arms dealer",
+        "illegal weapons dealer",
+
+        // Fraud / theft
+        "credit card fraud",
+        "identity theft",
+        "fraud operator",
+        "scam operator",
+
+        // Malicious cybercrime
+        "ransomware operator",
+        "malware for theft",
+        "phishing scammer",
+        "credential thief"
+        ];
+
+        bool prohibited =
+            prohibitedTerms.Any(term =>
+                combined.Contains(
+                    term,
+                    StringComparison.OrdinalIgnoreCase));
+
+        if (prohibited)
+        {
+            throw new ArgumentException(
+                "Interview preparation is not available for illegal or harmful job roles.");
+        }
     }
 
     private static string BuildQuestionPrompt(
@@ -113,6 +185,18 @@ public sealed class InterviewCoachService
 
         prompt.AppendLine(
             "You are a professional interview coach.");
+
+        prompt.AppendLine(
+    "Only provide interview preparation for legitimate and lawful employment.");
+
+        prompt.AppendLine(
+            "Do not generate interview questions, explanations, instructions, procedures, or advice that would facilitate criminal activity, illegal drug production, trafficking, violence, fraud, theft, malicious hacking, illegal weapons activity, or exploitation.");
+
+        prompt.AppendLine(
+            "If a role is disguised but clearly involves illegal or harmful activity, do not provide operational guidance.");
+
+        prompt.AppendLine(
+            "Legitimate sensitive professions such as cybersecurity, chemistry, medicine, law enforcement, forensics, and regulated engineering are allowed, but questions must remain lawful, defensive, safety-focused, and professional.");
 
         prompt.AppendLine(
             "Generate realistic interview questions for the candidate.");
@@ -163,12 +247,27 @@ public sealed class InterviewCoachService
     }
 
     private static string BuildFeedbackPrompt(
-        InterviewAnswerRequest request)
+    InterviewAnswerRequest request)
     {
         var prompt = new StringBuilder();
 
         prompt.AppendLine(
             "You are a fair and constructive interview coach.");
+
+        prompt.AppendLine(
+            "Only evaluate answers for legitimate and lawful professional activity.");
+
+        prompt.AppendLine(
+            "Do not improve, optimize, correct, or expand an answer in a way that provides instructions or practical guidance for criminal or harmful activity.");
+
+        prompt.AppendLine(
+            "This includes illegal drug production or trafficking, violence, fraud, theft, malicious hacking, human trafficking, illegal weapons activity, or other criminal conduct.");
+
+        prompt.AppendLine(
+            "For legitimate sensitive professions such as cybersecurity, chemistry, medicine, law enforcement, forensics, and engineering, keep feedback lawful, defensive, ethical, safety-focused, and compliance-focused.");
+
+        prompt.AppendLine(
+            "If the supplied role, question, or answer clearly requests harmful or illegal operational guidance, do not provide an improved operational answer.");
 
         prompt.AppendLine(
             "Evaluate the candidate's answer based only on the supplied question, answer, role, and job description.");
@@ -179,6 +278,7 @@ public sealed class InterviewCoachService
         prompt.AppendLine(
             "For behavioural questions, consider the STAR method: situation, task, action, and result.");
 
+        // KEEP THE REST OF YOUR EXISTING METHOD HERE
         prompt.AppendLine();
         prompt.AppendLine("ROLE");
         prompt.AppendLine(
@@ -211,7 +311,10 @@ public sealed class InterviewCoachService
             "Return no more than four improvements.");
 
         prompt.AppendLine(
-            "Provide a stronger example answer without inventing qualifications or experience.");
+            "For legitimate interview content, provide a stronger example answer without inventing qualifications or experience.");
+
+        prompt.AppendLine(
+            "If the content involves illegal or harmful operational activity, do not provide an improved operational answer; instead give a brief safety-focused response.");
 
         prompt.AppendLine(
             "Keep the improved answer under 180 words.");
