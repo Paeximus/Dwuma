@@ -69,6 +69,13 @@ namespace Dwuma.Services
                 _db.Profiles.Add(profile);
             }
 
+            user.FullName =
+                $"{request.FirstName} {request.LastName}"
+           .Trim();
+
+            user.UpdatedAt =
+                DateTime.UtcNow;
+
             MapRequestToProfile(
                 request,
                 profile);

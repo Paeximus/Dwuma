@@ -106,7 +106,10 @@ public sealed class EmailService : IEmailService
 
         message.Body = bodyBuilder.ToMessageBody();
 
-        using var smtpClient = new SmtpClient();
+        using var smtpClient = new SmtpClient
+        {
+            CheckCertificateRevocation = false
+        };
 
         await smtpClient.ConnectAsync(
             host,

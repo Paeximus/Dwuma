@@ -58,7 +58,8 @@ public sealed class AuthService
 
         var user = new User
         {
-            Email = email,
+            FullName = string.Empty,
+            Email = email.Trim().ToLowerInvariant(),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
              IsEmailVerified = false,
