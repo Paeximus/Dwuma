@@ -28,7 +28,7 @@ public partial class User
 
     public virtual ICollection<JobInteraction> JobInteractions { get; set; } = new List<JobInteraction>();
 
-    public virtual ICollection<JobListing> JobListings { get; set; } = new List<JobListing>();
+    //public virtual ICollection<JobListing> JobListings { get; set; } = new List<JobListing>();
 
     public virtual ICollection<NotificationEngagement> NotificationEngagements { get; set; } = new List<NotificationEngagement>();
 

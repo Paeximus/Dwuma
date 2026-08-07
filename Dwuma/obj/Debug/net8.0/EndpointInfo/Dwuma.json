@@ -749,6 +749,119 @@
         }
       }
     },
+    "/api/jobs/cached": {
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GhanaJobSearchRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GhanaJobSearchRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/GhanaJobSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/careerjet": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "jobs"
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "Ghana"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Profile": {
       "post": {
         "tags": [
@@ -1150,6 +1263,39 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "GhanaJobSearchRequest": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "maxLength": 120,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "maxLength": 120,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
+          },
+          "page": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32"
+          },
+          "companySearch": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.RateLimiting;
 using Resend;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -317,8 +318,20 @@ builder.Services.AddTransient<
     IResend,
     ResendClient>();
 
+builder.Services.Configure<ForwardedHeadersOptions>(
+    options =>
+    {
+        options.ForwardedHeaders =
+            ForwardedHeaders.XForwardedFor |
+            ForwardedHeaders.XForwardedProto;
+
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 
 app.UseSwagger();
 bool enableSwagger =

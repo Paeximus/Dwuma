@@ -1,7 +1,7 @@
 [
   {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_14",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_15",
     "RelativePath": "",
     "HttpMethod": "GET",
     "IsController": false,
@@ -338,6 +338,73 @@
   },
   {
     "ContainingType": "Dwuma.Controllers.JobsController",
+    "Method": "GetCachedJobs",
+    "RelativePath": "api/jobs/cached",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "Dwuma.Models.Jobs.GhanaJobSearchRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "Dwuma.Models.Jobs.GhanaJobSearchResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Dwuma.Controllers.JobsController",
+    "Method": "SearchCareerjet",
+    "RelativePath": "api/jobs/careerjet",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "query",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "location",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "page",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "pageSize",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "Dwuma.Models.Jobs.GhanaJobSearchResponse",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Dwuma.Controllers.JobsController",
     "Method": "Ghana",
     "RelativePath": "api/jobs/ghana",
     "HttpMethod": "GET",
@@ -656,7 +723,7 @@
   },
   {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_13",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_14",
     "RelativePath": "health",
     "HttpMethod": "GET",
     "IsController": false,

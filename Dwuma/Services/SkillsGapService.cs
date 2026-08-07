@@ -18,159 +18,102 @@ public sealed class SkillsGapService
     }
 
     public async Task<SkillsGapResponse> AnalyseAsync(
-        SkillsGapRequest request,
-        CancellationToken cancellationToken = default)
+    SkillsGapRequest request,
+    CancellationToken cancellationToken = default)
     {
-        ValidateRequest(request);
+        ArgumentNullException.ThrowIfNull(request);
 
-        string prompt = BuildPrompt(request);
-
-        string rawJson =
-    await _geminiService.GenerateJsonAsync(
-        prompt,
-        responseSchema: CreateResponseSchema(),
-        maxOutputTokens: 5000,
-        cancellationToken: cancellationToken);
-
-        return ParseResponse(rawJson);
-    }
-
-    private static void ValidateRequest(
-        SkillsGapRequest request)
-    {
-        if (request is null)
-        {
-            throw new ArgumentNullException(nameof(request));
-        }
-
-        if (string.IsNullOrWhiteSpace(request.JobTitle))
+        if (request.Skills is null ||
+            request.Skills.Count == 0)
         {
             throw new ArgumentException(
-                "The target job title is required.");
+                "At least one skill is required.");
         }
 
-        request.Skills ??= [];
+        if (string.IsNullOrWhiteSpace(
+                request.FieldOfStudy))
+        {
+            throw new ArgumentException(
+                "Field of work is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                request.JobTitle))
+        {
+            throw new ArgumentException(
+                "Role is required.");
+        }
+
+        List<string> skills =
+            request.Skills
+                .Where(skill =>
+                    !string.IsNullOrWhiteSpace(skill))
+                .Select(skill => skill.Trim())
+                .Distinct(
+                    StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+        if (skills.Count == 0)
+        {
+            throw new ArgumentException(
+                "At least one valid skill is required.");
+        }
+
+        string skillsText =
+            string.Join(
+                ", ",
+                skills);
+
+        string prompt = $"""
+        You are an expert career adviser familiar with
+        graduate employment and professional skills.
+
+        Analyse the candidate's skills against the
+        skills normally required for the target role.
+
+        CURRENT SKILLS:
+        {skillsText}
+
+        FIELD OF WORK:
+        {request.FieldOfStudy.Trim()}
+
+        TARGET ROLE:
+        {request.JobTitle.Trim()}
+
+        Determine the skill gap between the
+        candidate's current skills and the skills
+        required for the target role.
+
+        Requirements:
+
+        - Return at most 8 important skills.
+        - For every skill, classify the candidate as:
+          present, partial, or absent.
+        - Explain briefly why each skill matters.
+        - Identify the most important missing skills.
+        - Recommend at most 5 learning resources.
+        - Prefer free learning resources.
+        - Keep the final summary below 80 words.
+        - Return valid JSON only.
+        - Do not use markdown.
+        - Do not use code fences.
+        """;
+
+        string response =
+            await _geminiService.GenerateJsonAsync(
+                prompt,
+                responseSchema:
+                    CreateResponseSchema(),
+                maxOutputTokens: 5000,
+                cancellationToken:
+                    cancellationToken);
+
+        SkillsGapResponse result =
+            ParseResponse(response);
+
+        return result;
     }
-
-    private static string BuildPrompt(
-        SkillsGapRequest request)
-    {
-        var prompt = new StringBuilder();
-
-        prompt.AppendLine(
-            "You are an expert career adviser familiar with graduate employment in Ghana.");
-
-        prompt.AppendLine(
-            "Analyse the candidate against the target role.");
-
-        prompt.AppendLine(
-            "Do not claim that a skill is present unless the candidate supplied evidence for it.");
-
-        prompt.AppendLine();
-        prompt.AppendLine("CANDIDATE PROFILE");
-        prompt.AppendLine(
-            $"Skills: {string.Join(", ", request.Skills)}");
-
-        if (!string.IsNullOrWhiteSpace(request.Education))
-        {
-            prompt.AppendLine(
-                $"Education: {request.Education}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.FieldOfStudy))
-        {
-            prompt.AppendLine(
-                $"Field of study: {request.FieldOfStudy}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.Experience))
-        {
-            prompt.AppendLine(
-                $"Experience: {request.Experience}");
-        }
-
-        prompt.AppendLine();
-        prompt.AppendLine("TARGET ROLE");
-        prompt.AppendLine($"Job title: {request.JobTitle}");
-
-        if (!string.IsNullOrWhiteSpace(request.Industry))
-        {
-            prompt.AppendLine(
-                $"Industry: {request.Industry}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(
-            request.JobDescription))
-        {
-            prompt.AppendLine("Job description:");
-            prompt.AppendLine(request.JobDescription);
-        }
-
-        prompt.AppendLine();
-        prompt.AppendLine("INSTRUCTIONS");
-        prompt.AppendLine(
-            "1. Identify the most important skills for the role.");
-
-        prompt.AppendLine(
-            "2. Mark every skill as present, partial, or absent.");
-
-        prompt.AppendLine(
-            "3. Provide a required level: foundational, intermediate, or advanced.");
-
-        prompt.AppendLine(
-            "4. Recommend practical learning resources for partial or absent skills.");
-
-        prompt.AppendLine(
-            "5. Prefer free resources or resources that can be audited for free.");
-
-        prompt.AppendLine(
-            "6. Calculate a realistic match percentage from 0 to 100.");
-
-        prompt.AppendLine(
-            "Return no more than 8 skill items and no more than 5 learning resources.");
-
-        prompt.AppendLine(
-            "Keep the summary under 80 words.");
-
-        prompt.AppendLine(
-            "Keep each skill description under 35 words.");
-
-        prompt.AppendLine(
-            "Keep each resource description under 30 words.");
-
-        prompt.AppendLine(
-            "7. Return valid JSON only.");
-
-        prompt.AppendLine();
-        prompt.AppendLine("RETURN THIS EXACT JSON STRUCTURE:");
-
-        prompt.AppendLine(
-            """
-            {
-              "matchPercentage": 72,
-              "summary": "A brief honest and encouraging assessment.",
-              "skills": [
-                {
-                  "name": "SQL",
-                  "status": "present",
-                  "level": "intermediate",
-                  "description": "Explanation of the assessment."
-                }
-              ],
-              "resources": [
-                {
-                  "name": "Resource name",
-                  "platform": "Platform name",
-                  "description": "Why this resource is useful.",
-                  "url": "https://example.com",
-                  "isFree": true
-                }
-              ]
-            }
-            """);
-
-        return prompt.ToString();
-    }
+    
 
     private static object CreateResponseSchema()
     {

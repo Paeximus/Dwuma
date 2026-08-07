@@ -1,6 +1,7 @@
-﻿using Dwuma.Models.Enums;
-using Microsoft.EntityFrameworkCore;
+﻿using DocumentFormat.OpenXml.Bibliography;
 using Dwuma.Models.Enums;
+using Dwuma.Models.Enums;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 
@@ -241,11 +242,38 @@ public partial class DwumaContext : DbContext
                 .HasMaxLength(255)
                 .IsUnicode(false)
                 .HasColumnName("title");
-            entity.Property(e => e.UserId).HasColumnName("user_id");
-
-            entity.HasOne(d => d.User).WithMany(p => p.JobListings)
-                .HasForeignKey(d => d.UserId)
-                .HasConstraintName("FK__JOB_LISTI__user___571DF1D5");
+            entity.Property(e => e.ExternalId)
+                .HasMaxLength(255)
+                .HasColumnName("external_id");
+            entity.Property(e => e.Industry)
+                .HasMaxLength(150)
+                .HasColumnName("industry");
+            entity.Property(e => e.RequiredSkills)
+        .HasColumnType("text")
+        .HasColumnName("required_skills");
+            entity.Property(e => e.Salary)
+        .HasMaxLength(255)
+        .HasColumnName("salary");
+            entity.Property(e => e.IsRemote)
+        .HasColumnType("tinyint(1)")
+        .HasDefaultValue(false)
+        .HasColumnName("is_remote");
+            entity.Property(e => e.Source)
+        .HasMaxLength(100)
+        .HasColumnName("source");
+            entity.Property(e => e.PostedAt)
+        .HasColumnType("datetime")
+        .HasColumnName("posted_at");
+            entity.Property(e => e.ExpiresAt)
+        .HasColumnType("datetime")
+        .HasColumnName("expires_at");
+            entity.HasIndex(e => new
+            {
+                e.Source,
+                e.ExternalId
+            })
+    .IsUnique()
+    .HasDatabaseName("UX_JOB_LISTINGS_SOURCE_EXTERNAL_ID");
         });
 
         modelBuilder.Entity<Notification>(entity =>

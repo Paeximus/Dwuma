@@ -10,10 +10,14 @@ namespace Dwuma.Controllers;
 public sealed class JobsController : ControllerBase
 {
     private readonly JoobleJobService _joobleJobService;
+    private readonly CareerjetJobService _careerjetJobService;
 
-    public JobsController(JoobleJobService joobleJobService)
+    public JobsController(
+    JoobleJobService joobleJobService,
+    CareerjetJobService careerjetJobService)
     {
         _joobleJobService = joobleJobService;
+        _careerjetJobService = careerjetJobService;
     }
 
     [AllowAnonymous]
@@ -66,5 +70,62 @@ public sealed class JobsController : ControllerBase
         return Ok(await _joobleJobService.SearchAsync(
             request,
             cancellationToken));
+    }
+
+    [HttpPost("cached")]
+    public async Task<ActionResult<GhanaJobSearchResponse>>
+    GetCachedJobs(
+        [FromBody] GhanaJobSearchRequest request,
+        CancellationToken cancellationToken)
+    {
+        GhanaJobSearchResponse result =
+            await _joobleJobService.GetCachedJobsAsync(
+                request,
+                cancellationToken);
+
+        return Ok(result);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("careerjet")]
+    public async Task<ActionResult<GhanaJobSearchResponse>>
+    SearchCareerjet(
+        [FromQuery] string? query = "jobs",
+        [FromQuery] string? location = "Ghana",
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new GhanaJobSearchRequest
+        {
+            Keywords = query,
+            Location = location,
+            Page = page,
+            PageSize = pageSize,
+            CompanySearch = false
+        };
+
+        string userIp =
+            HttpContext.Connection.RemoteIpAddress?
+                .MapToIPv4()
+                .ToString()
+            ?? "127.0.0.1";
+
+        string userAgent =
+            Request.Headers.UserAgent.ToString();
+
+        if (string.IsNullOrWhiteSpace(userAgent))
+        {
+            userAgent = "DWUMA-Web-App";
+        }
+
+        GhanaJobSearchResponse result =
+            await _careerjetJobService.SearchAsync(
+                request,
+                userIp,
+                userAgent,
+                cancellationToken);
+
+        return Ok(result);
     }
 }

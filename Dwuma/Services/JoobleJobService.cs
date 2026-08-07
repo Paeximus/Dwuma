@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Dwuma.Models.Jobs;
+using Dwuma.Models.Data.DwumaContext;
+using Microsoft.EntityFrameworkCore;
 
 namespace Dwuma.Services;
 
@@ -11,6 +13,7 @@ public sealed class JoobleJobService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<JoobleJobService> _logger;
+    private readonly DwumaContext _db;
 
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web)
@@ -21,11 +24,13 @@ public sealed class JoobleJobService
     public JoobleJobService(
         HttpClient httpClient,
         IConfiguration configuration,
-        ILogger<JoobleJobService> logger)
+        ILogger<JoobleJobService> logger,
+        DwumaContext db)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger;
+        _db = db;
     }
 
     public async Task<GhanaJobSearchResponse> SearchAsync(
@@ -112,12 +117,18 @@ public sealed class JoobleJobService
             JsonSerializer.Deserialize<JoobleSearchResponse>(
                 responseBody,
                 JsonOptions);
-
         if (joobleResponse is null)
         {
             throw new InvalidOperationException(
                 "The Ghana jobs provider returned an empty response.");
         }
+
+        List<Dwuma.Models.Jobs.JoobleJob> providerJobs =
+            joobleResponse.Jobs ?? [];
+
+        await CacheJobsAsync(
+            providerJobs,
+            cancellationToken);
 
         _logger.LogInformation(
             "Jooble returned {TotalCount} total jobs and {PageCount} jobs on this page.",
@@ -223,5 +234,303 @@ public sealed class JoobleJobService
             .Replace("\r", " ")
             .Replace("\n", " ")
             .Trim();
+    }
+
+    
+
+    private static DateTime? ParseUpdatedDate(
+    string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (DateTime.TryParse(
+                value,
+                out DateTime parsedDate))
+        {
+            return parsedDate.ToUniversalTime();
+        }
+
+        return null;
+    }
+
+    private static JobListing MapToJobListing(
+    Dwuma.Models.Jobs.JoobleJob source)
+    {
+        return new JobListing
+        {
+            ExternalId =
+                source.Id?.Trim(),
+
+            Title =
+                CleanText(source.Title),
+
+            Company =
+                CleanText(source.Company),
+
+            Location =
+                CleanText(source.Location),
+
+            JobType =
+                CleanText(source.Type),
+
+            Description =
+                CleanText(source.Snippet),
+
+            Salary =
+                CleanText(source.Salary),
+
+            Source =
+                string.IsNullOrWhiteSpace(source.Source)
+                    ? "Jooble"
+                    : CleanText(source.Source),
+
+            SourceUrl =
+                source.Link?.Trim(),
+
+            PostedAt =source.Updated,
+
+            DiscoveredAt =
+                DateTime.UtcNow,
+
+            Status =
+                "Active",
+
+            IsRemote =
+                IsRemoteJob(
+                    source.Title,
+                    source.Location,
+                    source.Snippet)
+        };
+    }
+
+
+    private static bool IsRemoteJob(
+    params string?[] values)
+    {
+        return values.Any(value =>
+            !string.IsNullOrWhiteSpace(value) &&
+            (
+                value.Contains(
+                    "remote",
+                    StringComparison.OrdinalIgnoreCase) ||
+                value.Contains(
+                    "work from home",
+                    StringComparison.OrdinalIgnoreCase) ||
+                value.Contains(
+                    "hybrid",
+                    StringComparison.OrdinalIgnoreCase)
+            ));
+    }
+
+    private async Task CacheJobsAsync(
+    IEnumerable<Dwuma.Models.Jobs.JoobleJob> providerJobs,
+    CancellationToken cancellationToken)
+    {
+        foreach (
+            Dwuma.Models.Jobs.JoobleJob providerJob
+            in providerJobs)
+        {
+            JobListing incoming =
+                MapToJobListing(providerJob);
+
+            if (string.IsNullOrWhiteSpace(
+                    incoming.ExternalId) ||
+                string.IsNullOrWhiteSpace(
+                    incoming.Source))
+            {
+                continue;
+            }
+
+            JobListing? existing =
+                await _db.JobListings
+                    .FirstOrDefaultAsync(
+                        job =>
+                            job.ExternalId ==
+                                incoming.ExternalId &&
+                            job.Source ==
+                                incoming.Source,
+                        cancellationToken);
+
+            if (existing is null)
+            {
+                _db.JobListings.Add(incoming);
+                continue;
+            }
+
+            existing.Title =
+                incoming.Title;
+
+            existing.Company =
+                incoming.Company;
+
+            existing.Location =
+                incoming.Location;
+
+            existing.JobType =
+                incoming.JobType;
+
+            existing.Description =
+                incoming.Description;
+
+            existing.Salary =
+                incoming.Salary;
+
+            existing.SourceUrl =
+                incoming.SourceUrl;
+
+            existing.PostedAt =
+                incoming.PostedAt;
+
+            existing.IsRemote =
+                incoming.IsRemote;
+
+            existing.Status =
+                "Active";
+
+            existing.DiscoveredAt =
+                DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync(
+            cancellationToken);
+    }
+
+    public async Task<GhanaJobSearchResponse> GetCachedJobsAsync(
+    GhanaJobSearchRequest request,
+    CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        int page = Math.Max(request.Page, 1);
+        int pageSize = Math.Clamp(request.PageSize, 1, 50);
+
+        string location =
+            NormalizeGhanaLocation(request.Location);
+
+        IQueryable<JobListing> query =
+            _db.JobListings
+                .AsNoTracking()
+                .Where(job =>
+                    job.Status == "Active" &&
+                    (
+                        !job.ExpiresAt.HasValue ||
+                        job.ExpiresAt > DateTime.UtcNow
+                    ));
+
+        if (!string.IsNullOrWhiteSpace(
+                request.Keywords))
+        {
+            string keywords =
+                request.Keywords.Trim();
+
+            query = query.Where(job =>
+                job.Title.Contains(keywords) ||
+                (
+                    job.Company != null &&
+                    job.Company.Contains(keywords)
+                ) ||
+                (
+                    job.Description != null &&
+                    job.Description.Contains(keywords)
+                ));
+        }
+
+        if (!location.Equals(
+                "Ghana",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            string city =
+                location.Replace(
+                    ", Ghana",
+                    "",
+                    StringComparison.OrdinalIgnoreCase)
+                .Trim();
+
+            query = query.Where(job =>
+                job.Location != null &&
+                job.Location.Contains(city));
+        }
+
+        int totalCount =
+            await query.CountAsync(
+                cancellationToken);
+
+        List<JobListing> cachedJobs =
+            await query
+                .OrderByDescending(job =>
+                    job.PostedAt ??
+                    job.DiscoveredAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(
+                    cancellationToken);
+
+        List<GhanaJobResult> jobs =
+            cachedJobs
+                .Select(job => new GhanaJobResult
+                {
+                    ExternalId =
+                        job.ExternalId ??
+                        job.Id.ToString(),
+
+                    Title =
+                        job.Title,
+
+                    Company =
+                        job.Company ??
+                        string.Empty,
+
+                    Location =
+                        job.Location ??
+                        string.Empty,
+
+                    Description =
+                        job.Description ??
+                        string.Empty,
+
+                    Salary =
+                        job.Salary ??
+                        string.Empty,
+
+                    JobType =
+                        job.JobType ??
+                        string.Empty,
+
+                    Source =
+                        job.Source ??
+                        string.Empty,
+
+                    ApplyUrl =
+                        job.SourceUrl ??
+                        string.Empty,
+
+                    UpdatedAt =
+                        job.PostedAt
+                })
+                .ToList();
+
+        return new GhanaJobSearchResponse
+        {
+            ProviderTotalCount =
+                totalCount,
+
+            ReturnedCount =
+                jobs.Count,
+
+            Page =
+                page,
+
+            PageSize =
+                pageSize,
+
+            Location =
+                location,
+
+            Jobs =
+                jobs
+        };
     }
 }

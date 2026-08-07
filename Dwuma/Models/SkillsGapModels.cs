@@ -4,20 +4,13 @@ namespace Dwuma.Models
 {
     // ─── REQUEST ─────────────────────────────────────────────────────────────
 
-    public class SkillsGapRequest
+    public sealed class SkillsGapRequest
     {
-        [Required]
-        public List<string> Skills { get; set; } = new();
+        public List<string> Skills { get; set; } = [];
 
-        public string? Education { get; set; }        // e.g. "BSc"
-        public string? FieldOfStudy { get; set; }     // e.g. "Computer Engineering"
-        public string? Experience { get; set; }       // e.g. "0", "2"
+        public string FieldOfStudy { get; set; } = string.Empty;
 
-        [Required]
         public string JobTitle { get; set; } = string.Empty;
-
-        public string? Industry { get; set; }
-        public string? JobDescription { get; set; }   // Full JD text, optional
     }
 
     // ─── RESPONSE ────────────────────────────────────────────────────────────

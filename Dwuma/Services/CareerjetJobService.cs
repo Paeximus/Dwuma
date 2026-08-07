@@ -1,8 +1,11 @@
-﻿using Dwuma.Models.Jobs;
-using Microsoft.AspNetCore.WebUtilities;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Dwuma.Models.Data.DwumaContext;
+using Dwuma.Models.Jobs;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Dwuma.Services;
 
@@ -10,6 +13,7 @@ public sealed class CareerjetJobService
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    private readonly DwumaContext _db;
     private readonly ILogger<CareerjetJobService> _logger;
 
     private static readonly JsonSerializerOptions JsonOptions =
@@ -21,19 +25,23 @@ public sealed class CareerjetJobService
     public CareerjetJobService(
         HttpClient httpClient,
         IConfiguration configuration,
+        DwumaContext db,
         ILogger<CareerjetJobService> logger)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _db = db;
         _logger = logger;
     }
 
     public async Task<GhanaJobSearchResponse> SearchAsync(
-        GhanaJobSearchRequest request,
-        string userIp,
-        string userAgent,
-        CancellationToken cancellationToken = default)
+    GhanaJobSearchRequest request,
+    string userIp,
+    string userAgent,
+    CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         string apiKey =
             _configuration["Careerjet:ApiKey"]
             ?? throw new InvalidOperationException(
@@ -45,21 +53,29 @@ public sealed class CareerjetJobService
 
         string localeCode =
             _configuration["Careerjet:LocaleCode"]
-            ?? "en_GB";
+            ?? "en_GH";
+
+        int page = Math.Max(request.Page, 1);
+        int pageSize = Math.Clamp(request.PageSize, 1, 50);
+
+        string keywords =
+            string.IsNullOrWhiteSpace(request.Keywords)
+                ? "jobs"
+                : request.Keywords.Trim();
 
         string location =
             string.IsNullOrWhiteSpace(request.Location)
                 ? "Ghana"
                 : request.Location.Trim();
 
-        var parameters =
+        var queryParameters =
             new Dictionary<string, string?>
             {
                 ["locale_code"] = localeCode,
-                ["keywords"] = request.Keywords?.Trim(),
+                ["keywords"] = keywords,
                 ["location"] = location,
-                ["page"] = request.Page.ToString(),
-                ["page_size"] = request.PageSize.ToString(),
+                ["page"] = page.ToString(),
+                ["page_size"] = pageSize.ToString(),
                 ["sort"] = "date",
                 ["user_ip"] = userIp,
                 ["user_agent"] = userAgent
@@ -68,7 +84,7 @@ public sealed class CareerjetJobService
         string requestUrl =
             QueryHelpers.AddQueryString(
                 baseUrl,
-                parameters);
+                queryParameters);
 
         string credentials =
             Convert.ToBase64String(
@@ -80,47 +96,47 @@ public sealed class CareerjetJobService
                 HttpMethod.Get,
                 requestUrl);
 
+        httpRequest.Headers.Referrer =
+            new Uri("https://dwuma-api.onrender.com");
+
+        _logger.LogInformation(
+            "Careerjet request. Location: {Location}; UserIp: {UserIp}; UserAgentPresent: {HasUserAgent}",
+            location,
+            userIp,
+            !string.IsNullOrWhiteSpace(userAgent));
+
         httpRequest.Headers.Authorization =
             new AuthenticationHeaderValue(
                 "Basic",
                 credentials);
 
-        using HttpResponseMessage response =
-        await _httpClient.SendAsync(
-        httpRequest,
-        cancellationToken);
+        httpRequest.Headers.Accept.Add(
+            new MediaTypeWithQualityHeaderValue(
+                "application/json"));
 
-        string responseBody =
-            await response.Content.ReadAsStringAsync(
+        using HttpResponseMessage response =
+            await _httpClient.SendAsync(
+                httpRequest,
                 cancellationToken);
 
-        if (response.StatusCode ==
-            System.Net.HttpStatusCode.Forbidden)
-        {
-            _logger.LogWarning(
-                "Careerjet rejected the request from the current server IP. Response: {Response}",
-                responseBody);
-
-            throw new UnauthorizedAccessException(
-                "Careerjet rejected this server's public IP address. " +
-                "Add the current public IP to the Careerjet publisher whitelist.");
-        }
+        string body =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError(
-                "Careerjet failed. Status: {StatusCode}. Reason: {ReasonPhrase}. Response: {Response}",
-                (int)response.StatusCode,
-                response.ReasonPhrase,
-                responseBody);
+                "Careerjet failed with HTTP {StatusCode}. Body: {Body}",
+                response.StatusCode,
+                body);
 
             throw new HttpRequestException(
-                $"Careerjet failed with HTTP {(int)response.StatusCode}.");
+                $"Careerjet returned HTTP {(int)response.StatusCode}.");
         }
 
         CareerjetSearchResponse? result =
             JsonSerializer.Deserialize<CareerjetSearchResponse>(
-                responseBody,
+                body,
                 JsonOptions);
 
         if (result is null)
@@ -129,57 +145,198 @@ public sealed class CareerjetJobService
                 "Careerjet returned an empty response.");
         }
 
-        if (string.Equals(
-                result.Type,
-                "LOCATIONS",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException(
-                string.IsNullOrWhiteSpace(result.Message)
-                    ? "Careerjet could not resolve the requested location."
-                    : result.Message);
-        }
+        await CacheJobsAsync(
+            result.Jobs,
+            cancellationToken);
+
         List<GhanaJobResult> jobs =
             result.Jobs
-                .Select(job =>
-                    new GhanaJobResult
-                    {
-                        ExternalId =
-                            Convert.ToHexString(
-                                System.Security.Cryptography.SHA256.HashData(
-                                    Encoding.UTF8.GetBytes(job.ApplyUrl))),
-
-                        Title = job.Title,
-                        Company = job.Company,
-                        Location = job.Location,
-                        Description = job.Description,
-                        Salary = job.Salary,
-                        JobType = string.Empty,
-                        Source =
-                            string.IsNullOrWhiteSpace(job.Source)
-                                ? "Careerjet"
-                                : job.Source,
-                        ApplyUrl = job.ApplyUrl,
-                        UpdatedAt =
-                            DateTime.TryParse(
-                                job.Date,
-                                out DateTime parsedDate)
-                                ? parsedDate
-                                : null
-                    })
                 .Where(job =>
                     !string.IsNullOrWhiteSpace(job.Title) &&
-                    !string.IsNullOrWhiteSpace(job.ApplyUrl))
+                    !string.IsNullOrWhiteSpace(job.Url))
+                .Select(MapResult)
                 .ToList();
 
         return new GhanaJobSearchResponse
         {
             ProviderTotalCount = result.Hits,
             ReturnedCount = jobs.Count,
-            Page = request.Page,
-            PageSize = request.PageSize,
+            Page = page,
+            PageSize = pageSize,
             Location = location,
             Jobs = jobs
         };
+    }
+
+    private static GhanaJobResult MapResult(
+        CareerjetJob job)
+    {
+        return new GhanaJobResult
+        {
+            ExternalId =
+                GenerateExternalId(job),
+
+            Title =
+                job.Title?.Trim()
+                ?? string.Empty,
+
+            Company =
+                job.Company?.Trim()
+                ?? string.Empty,
+
+            Location =
+                job.Location?.Trim()
+                ?? string.Empty,
+
+            Description =
+                job.Description?.Trim()
+                ?? string.Empty,
+
+            Salary =
+                job.Salary?.Trim()
+                ?? string.Empty,
+
+            JobType =
+                string.Empty,
+
+            Source =
+                "Careerjet",
+
+            ApplyUrl =
+                job.Url?.Trim()
+                ?? string.Empty,
+
+            UpdatedAt =
+                ParseDate(job.Date)
+        };
+    }
+
+    private async Task CacheJobsAsync(
+        IEnumerable<CareerjetJob> providerJobs,
+        CancellationToken cancellationToken)
+    {
+        foreach (CareerjetJob providerJob in providerJobs)
+        {
+            string externalId =
+                GenerateExternalId(providerJob);
+
+            JobListing? existing =
+                await _db.JobListings
+                    .FirstOrDefaultAsync(
+                        job =>
+                            job.Source == "Careerjet" &&
+                            job.ExternalId == externalId,
+                        cancellationToken);
+
+            if (existing is null)
+            {
+                _db.JobListings.Add(
+                    new JobListing
+                    {
+                        ExternalId = externalId,
+                        Title =
+                            providerJob.Title?.Trim()
+                            ?? string.Empty,
+                        Company =
+                            providerJob.Company?.Trim(),
+                        Location =
+                            providerJob.Location?.Trim(),
+                        Description =
+                            providerJob.Description?.Trim(),
+                        Salary =
+                            providerJob.Salary?.Trim(),
+                        Source = "Careerjet",
+                        SourceUrl =
+                            providerJob.Url?.Trim(),
+                        PostedAt =
+                            ParseDate(providerJob.Date),
+                        DiscoveredAt =
+                            DateTime.UtcNow,
+                        Status = "Active",
+                        IsRemote =
+                            ContainsRemoteText(
+                                providerJob.Title,
+                                providerJob.Location,
+                                providerJob.Description)
+                    });
+
+                continue;
+            }
+
+            existing.Title =
+                providerJob.Title?.Trim()
+                ?? existing.Title;
+
+            existing.Company =
+                providerJob.Company?.Trim();
+
+            existing.Location =
+                providerJob.Location?.Trim();
+
+            existing.Description =
+                providerJob.Description?.Trim();
+
+            existing.Salary =
+                providerJob.Salary?.Trim();
+
+            existing.SourceUrl =
+                providerJob.Url?.Trim();
+
+            existing.PostedAt =
+                ParseDate(providerJob.Date);
+
+            existing.DiscoveredAt =
+                DateTime.UtcNow;
+
+            existing.Status =
+                "Active";
+        }
+
+        await _db.SaveChangesAsync(
+            cancellationToken);
+    }
+
+    private static string GenerateExternalId(
+        CareerjetJob job)
+    {
+        string value =
+            $"{job.Title}|" +
+            $"{job.Company}|" +
+            $"{job.Location}|" +
+            $"{job.Url}";
+
+        byte[] hash =
+            SHA256.HashData(
+                Encoding.UTF8.GetBytes(value));
+
+        return Convert.ToHexString(hash);
+    }
+
+    private static DateTime? ParseDate(
+        string? value)
+    {
+        return DateTime.TryParse(
+            value,
+            out DateTime date)
+                ? date.ToUniversalTime()
+                : null;
+    }
+
+    private static bool ContainsRemoteText(
+        params string?[] values)
+    {
+        return values.Any(value =>
+            !string.IsNullOrWhiteSpace(value) &&
+            (
+                value.Contains(
+                    "remote",
+                    StringComparison.OrdinalIgnoreCase) ||
+                value.Contains(
+                    "work from home",
+                    StringComparison.OrdinalIgnoreCase) ||
+                value.Contains(
+                    "hybrid",
+                    StringComparison.OrdinalIgnoreCase)
+            ));
     }
 }
