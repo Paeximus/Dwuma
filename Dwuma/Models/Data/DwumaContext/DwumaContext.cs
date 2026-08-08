@@ -40,6 +40,8 @@ public partial class DwumaContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<Notification> Notification { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Application>(entity =>
@@ -278,28 +280,44 @@ public partial class DwumaContext : DbContext
 
         modelBuilder.Entity<Notification>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__NOTIFICA__3213E83F26102432");
+            entity.HasKey(e => e.Id)
+                .HasName("PRIMARY");
 
             entity.ToTable("NOTIFICATIONS");
 
-            entity.Property(e => e.Id).HasColumnName("id");
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("user_id");
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id");
+
             entity.Property(e => e.Content)
-                .HasColumnType("text")
+                .HasMaxLength(4000)
                 .HasColumnName("content");
+
             entity.Property(e => e.NotificationType)
                 .HasMaxLength(100)
-                .IsUnicode(false)
                 .HasColumnName("notification_type");
-            entity.Property(e => e.ScheduledAt).HasColumnName("scheduled_at");
-            entity.Property(e => e.SentAt).HasColumnName("sent_at");
-            entity.Property(e => e.UserId).HasColumnName("user_id");
+
+            entity.Property(e => e.ScheduledAt)
+                .HasColumnType("datetime")
+                .HasColumnName("scheduled_at");
+
+            entity.Property(e => e.SentAt)
+                .HasColumnType("datetime")
+                .HasColumnName("sent_at");
+
             entity.Property(e => e.WasEngaged)
-                .HasDefaultValue(false)
                 .HasColumnName("was_engaged");
 
-            entity.HasOne(d => d.User).WithMany(p => p.Notifications)
+            entity.HasOne(d => d.User)
+                .WithMany(p => p.Notifications)
                 .HasForeignKey(d => d.UserId)
-                .HasConstraintName("FK__NOTIFICAT__user___787EE5A0");
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_NOTIFICATIONS_USERS");
         });
 
         modelBuilder.Entity<NotificationEngagement>(entity =>

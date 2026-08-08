@@ -10,13 +10,16 @@ public sealed class InterviewCoachService
 {
     private readonly GeminiService _geminiService;
     private readonly ILogger<InterviewCoachService> _logger;
+    private readonly NotificationService _notificationService;
 
     public InterviewCoachService(
         GeminiService geminiService,
-        ILogger<InterviewCoachService> logger)
+        ILogger<InterviewCoachService> logger,
+        NotificationService notificationService)
     {
         _geminiService = geminiService;
         _logger = logger;
+        _notificationService = notificationService;
     }
 
     public async Task<InterviewQuestionResponse> GenerateQuestionsAsync(

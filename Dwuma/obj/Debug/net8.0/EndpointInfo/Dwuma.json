@@ -862,6 +862,126 @@
         }
       }
     },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/notifications/read-all": {
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/notifications/{id}": {
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/notifications/unread-count": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/notifications/test": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Profile": {
       "post": {
         "tags": [
@@ -1030,19 +1150,42 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/TailorRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TailorRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/TailorRequest"
+                "required": [
+                  "File",
+                  "JobTitle"
+                ],
+                "type": "object",
+                "properties": {
+                  "File": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "JobTitle": {
+                    "type": "string"
+                  },
+                  "JobDescription": {
+                    "type": "string"
+                  },
+                  "CompanyName": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "File": {
+                  "style": "form"
+                },
+                "JobTitle": {
+                  "style": "form"
+                },
+                "JobDescription": {
+                  "style": "form"
+                },
+                "CompanyName": {
+                  "style": "form"
+                }
               }
             }
           }
@@ -1074,37 +1217,41 @@
         }
       }
     },
-    "/api/ResumeTailor/parse-cv": {
+    "/api/ResumeTailor/download": {
       "post": {
         "tags": [
           "ResumeTailor"
         ],
         "requestBody": {
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
-                "required": [
-                  "File"
-                ],
-                "type": "object",
-                "properties": {
-                  "File": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              },
-              "encoding": {
-                "File": {
-                  "style": "form"
-                }
+                "$ref": "#/components/schemas/DownloadRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -1379,6 +1526,28 @@
           },
           "user": {
             "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DownloadRequest": {
+        "required": [
+          "jobTitle",
+          "tailoredCv"
+        ],
+        "type": "object",
+        "properties": {
+          "tailoredCv": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "jobTitle": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "companyName": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2138,6 +2307,35 @@
         },
         "additionalProperties": false
       },
+      "NotificationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "OnboardingStatus": {
         "enum": [
           0,
@@ -2585,37 +2783,6 @@
             "items": {
               "$ref": "#/components/schemas/LearningResource"
             },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "TailorRequest": {
-        "required": [
-          "cvText",
-          "jobDescription",
-          "jobTitle"
-        ],
-        "type": "object",
-        "properties": {
-          "cvText": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "jobTitle": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "jobDescription": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "companyName": {
-            "type": "string",
-            "nullable": true
-          },
-          "tailoringFocus": {
-            "type": "string",
             "nullable": true
           }
         },

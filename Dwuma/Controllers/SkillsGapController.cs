@@ -15,11 +15,13 @@ namespace Dwuma.Controllers
     {
         private readonly SkillsGapService _skillsGapService;
         private readonly ILogger<SkillsGapController> _logger;
+        private readonly NotificationService _notificationService;
 
-        public SkillsGapController(SkillsGapService skillsGapService, ILogger<SkillsGapController> logger)
+        public SkillsGapController(SkillsGapService skillsGapService, ILogger<SkillsGapController> logger, NotificationService notificationService)
         {
             _skillsGapService = skillsGapService;
             _logger = logger;
+            _notificationService = notificationService;
         }
 
         [HttpPost("analyse")]
@@ -41,6 +43,14 @@ namespace Dwuma.Controllers
             {
                 _logger.LogInformation("Skills gap analysis requested for role: {Role}", request.JobTitle);
                 var result = await _skillsGapService.AnalyseAsync(request);
+
+                int userId = GetUserId();
+                await _notificationService.CreateAsync(
+                    userId,
+                    "Your skills gap analysis is ready to review.",
+                    "Skills Gap Analysis",
+                    CancellationToken.None);
+
                 return Ok(result);
             }
             catch (Exception ex)
@@ -48,6 +58,24 @@ namespace Dwuma.Controllers
                 _logger.LogError(ex, "Error during skills gap analysis.");
                 return StatusCode(500, new { message = "Analysis failed. Please try again." });
             }
+        }
+
+        private int GetUserId()
+        {
+            string? userIdValue =
+                User.FindFirst(
+                    System.Security.Claims.ClaimTypes.NameIdentifier)
+                ?.Value;
+
+            if (!int.TryParse(
+                    userIdValue,
+                    out int userId))
+            {
+                throw new UnauthorizedAccessException(
+                    "Unable to identify the current user.");
+            }
+
+            return userId;
         }
     }
 }

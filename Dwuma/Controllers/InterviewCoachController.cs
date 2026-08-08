@@ -14,13 +14,16 @@ public sealed class InterviewCoachController : ControllerBase
 {
     private readonly InterviewCoachService _interviewCoach;
     private readonly ILogger<InterviewCoachController> _logger;
+    private readonly NotificationService _notificationService;
 
     public InterviewCoachController(
         InterviewCoachService interviewCoach,
-        ILogger<InterviewCoachController> logger)
+        ILogger<InterviewCoachController> logger,
+        NotificationService notificationService)
     {
         _interviewCoach = interviewCoach;
         _logger = logger;
+        _notificationService = notificationService;
     }
 
     [HttpPost("questions")]
@@ -77,6 +80,15 @@ public sealed class InterviewCoachController : ControllerBase
                 await _interviewCoach.EvaluateAnswerAsync(
                     request,
                     cancellationToken);
+
+
+            int userId = GetUserId();
+
+            await _notificationService.CreateAsync(
+                userId,
+                "Your interview feedback and score are ready to review.",
+                "Interview",
+                cancellationToken);
 
             return Ok(response);
         }
@@ -158,5 +170,24 @@ public sealed class InterviewCoachController : ControllerBase
                         "The voice interview could not be evaluated."
                 });
         }
+
+    }
+
+    private int GetUserId()
+    {
+        string? userIdValue =
+            User.FindFirst(
+                System.Security.Claims.ClaimTypes.NameIdentifier)
+            ?.Value;
+
+        if (!int.TryParse(
+                userIdValue,
+                out int userId))
+        {
+            throw new UnauthorizedAccessException(
+                "Unable to identify the current user.");
+        }
+
+        return userId;
     }
 }

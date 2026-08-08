@@ -41,80 +41,517 @@ namespace Dwuma.Services
 
             _logger.LogInformation("Gemini Response:\n{Response}", rawResponse);
 
-            return ParseResponse(rawResponse);
+            TailorResponse result = ParseResponse(rawResponse);
+
+            result.TailoredCv =
+                NormalizeTailoredCvText(
+                    result.TailoredCv);
+
+            return result;
         }
 
         public async Task<string> ParseCvFileAsync(IFormFile file)
         {
             if (file == null || file.Length == 0)
+            {
                 throw new Exception("CV file is empty.");
+            }
 
-            if (file.ContentType == "text/plain")
+            string extension =
+                Path.GetExtension(file.FileName)
+                    .ToLowerInvariant();
+
+            // TXT
+            if (file.ContentType == "text/plain" ||
+                extension == ".txt")
             {
                 using var reader =
                     new StreamReader(file.OpenReadStream());
 
-                return await reader.ReadToEndAsync();
+                string text =
+                    await reader.ReadToEndAsync();
+
+                return CleanParsedCvText(text);
             }
 
-            if (file.ContentType == "application/pdf")
+            // PDF
+            if (file.ContentType == "application/pdf" ||
+                extension == ".pdf")
             {
-                using var stream = file.OpenReadStream();
-                using var pdf = PdfDocument.Open(stream);
+                using var stream =
+                    file.OpenReadStream();
 
-                var text = string.Join(
-                    Environment.NewLine,
-                    pdf.GetPages().Select(p => p.Text));
+                using var pdf =
+                    PdfDocument.Open(stream);
+
+                var builder =
+                    new StringBuilder();
+
+                foreach (var page in pdf.GetPages())
+                {
+                    string pageText =
+                        page.Text;
+
+                    if (string.IsNullOrWhiteSpace(pageText))
+                    {
+                        continue;
+                    }
+
+                    builder.AppendLine(
+                        pageText.Trim());
+
+                    builder.AppendLine();
+                }
+
+                string text =
+                    builder.ToString();
 
                 if (string.IsNullOrWhiteSpace(text))
-                    throw new Exception("No readable text found.");
+                {
+                    throw new Exception(
+                        "No readable text found in the PDF.");
+                }
 
-                return text;
+                return CleanParsedCvText(text);
+            }
+
+            // DOCX
+            if (file.ContentType ==
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+                extension == ".docx")
+            {
+                using var memoryStream =
+                    new MemoryStream();
+
+                await file.CopyToAsync(
+                    memoryStream);
+
+                memoryStream.Position = 0;
+
+                using var document =
+                    WordprocessingDocument.Open(
+                        memoryStream,
+                        false);
+
+                Body? body =
+                    document.MainDocumentPart?
+                        .Document?
+                        .Body;
+
+                if (body == null)
+                {
+                    throw new Exception(
+                        "The Word document does not contain readable content.");
+                }
+
+                var builder =
+                    new StringBuilder();
+
+                foreach (Paragraph paragraph
+                         in body.Descendants<Paragraph>())
+                {
+                    string text =
+                        paragraph.InnerText?.Trim()
+                        ?? string.Empty;
+
+                    if (string.IsNullOrWhiteSpace(text))
+                    {
+                        builder.AppendLine();
+                        continue;
+                    }
+
+                    builder.AppendLine(text);
+                }
+
+                string extractedText =
+                    builder.ToString();
+
+                if (string.IsNullOrWhiteSpace(
+                        extractedText))
+                {
+                    throw new Exception(
+                        "No readable text found in the Word document.");
+                }
+
+                return CleanParsedCvText(
+                    extractedText);
             }
 
             throw new Exception(
-                "Only PDF and TXT files are supported.");
+                "Only PDF, DOCX and TXT files are supported.");
         }
 
         public async Task<byte[]> GenerateDocxAsync(
-            DownloadRequest request)
+    DownloadRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.TailoredCv))
-                throw new Exception("No CV content provided.");
+            if (string.IsNullOrWhiteSpace(
+                    request.TailoredCv))
+            {
+                throw new Exception(
+                    "No CV content provided.");
+            }
 
-            using var memoryStream = new MemoryStream();
+            string cvText =
+                NormalizeTailoredCvText(
+                    request.TailoredCv);
+
+            using var memoryStream =
+                new MemoryStream();
 
             using (var document =
-                   WordprocessingDocument.Create(
-                       memoryStream,
-                       DocumentFormat.OpenXml.WordprocessingDocumentType.Document,
-                       true))
+                WordprocessingDocument.Create(
+                    memoryStream,
+                    DocumentFormat.OpenXml
+                        .WordprocessingDocumentType.Document,
+                    true))
             {
-                var mainPart =
+                MainDocumentPart mainPart =
                     document.AddMainDocumentPart();
 
-                mainPart.Document = new Document();
+                mainPart.Document =
+                    new Document();
 
-                var body = new Body();
+                Body body =
+                    new Body();
 
-                var lines = request.TailoredCv.Split(
-                    Environment.NewLine,
-                    StringSplitOptions.None);
+                AddPageSettings(body);
 
-                foreach (var line in lines)
+                string[] lines =
+                    cvText.Split(
+                        '\n',
+                        StringSplitOptions.None);
+
+                bool firstContentLine = true;
+
+                foreach (string rawLine in lines)
                 {
-                    body.Append(
-                        new Paragraph(
-                            new Run(
-                                new Text(line))));
+                    string line =
+                        rawLine.Trim();
+
+                    if (string.IsNullOrWhiteSpace(
+                            line))
+                    {
+                        continue;
+                    }
+
+                    if (firstContentLine)
+                    {
+                        AddNameParagraph(
+                            body,
+                            line);
+
+                        firstContentLine = false;
+                        continue;
+                    }
+
+                    if (IsCvHeading(line))
+                    {
+                        AddHeadingParagraph(
+                            body,
+                            line);
+
+                        continue;
+                    }
+
+                    if (IsBullet(line))
+                    {
+                        string bulletText =
+                            RemoveBulletPrefix(line);
+
+                        AddBulletParagraph(
+                            body,
+                            bulletText);
+
+                        continue;
+                    }
+
+                    AddNormalParagraph(
+                        body,
+                        line);
                 }
 
-                mainPart.Document.Append(body);
+                mainPart.Document.Append(
+                    body);
+
                 mainPart.Document.Save();
             }
 
             return await Task.FromResult(
                 memoryStream.ToArray());
+        }
+
+        private static void AddNameParagraph(
+    Body body,
+    string text)
+        {
+            var paragraph =
+                new Paragraph();
+
+            var properties =
+                new ParagraphProperties(
+                    new Justification
+                    {
+                        Val = JustificationValues.Center
+                    },
+                    new SpacingBetweenLines
+                    {
+                        After = "120"
+                    });
+
+            paragraph.Append(
+                properties);
+
+            var run =
+                new Run();
+
+            run.Append(
+                new RunProperties(
+                    new Bold(),
+                    new FontSize
+                    {
+                        Val = "32"
+                    },
+                    new RunFonts
+                    {
+                        Ascii = "Arial",
+                        HighAnsi = "Arial"
+                    }));
+
+            run.Append(
+                new Text(text)
+                {
+                    Space =
+                        DocumentFormat.OpenXml
+                            .SpaceProcessingModeValues
+                            .Preserve
+                });
+
+            paragraph.Append(run);
+
+            body.Append(paragraph);
+        }
+
+        private static string RemoveBulletPrefix( string line)
+        {
+            string value =
+                line.Trim();
+
+            if (value.StartsWith("• ") ||
+                value.StartsWith("- ") ||
+                value.StartsWith("* "))
+            {
+                return value[2..].Trim();
+            }
+
+            return value;
+        }
+
+        private static bool IsBullet(string line)
+        {
+            return
+                line.StartsWith("• ") ||
+                line.StartsWith("- ") ||
+                line.StartsWith("* ");
+        }
+
+        private static bool IsCvHeading( string line)
+        {
+            string normalized =
+                line.Trim()
+                    .TrimEnd(':')
+                    .ToUpperInvariant();
+
+            string[] headings =
+            [
+                "PROFESSIONAL SUMMARY",
+        "CAREER SUMMARY",
+        "PROFILE",
+        "SUMMARY",
+
+        "SKILLS",
+        "CORE SKILLS",
+        "TECHNICAL SKILLS",
+        "KEY SKILLS",
+
+        "WORK EXPERIENCE",
+        "PROFESSIONAL EXPERIENCE",
+        "EMPLOYMENT HISTORY",
+        "EXPERIENCE",
+
+        "PROJECTS",
+        "PROJECT EXPERIENCE",
+
+        "EDUCATION",
+        "ACADEMIC BACKGROUND",
+
+        "CERTIFICATIONS",
+        "CERTIFICATES",
+
+        "ACHIEVEMENTS",
+        "AWARDS",
+
+        "VOLUNTEER EXPERIENCE",
+
+        "LEADERSHIP EXPERIENCE",
+
+        "REFERENCES"
+            ];
+
+            return headings.Contains(
+                normalized);
+        }
+
+        private static void AddBulletParagraph( Body body, string text)
+        {
+            var paragraph =
+                new Paragraph();
+
+            paragraph.Append(
+                new ParagraphProperties(
+                    new Indentation
+                    {
+                        Left = "360",
+                        Hanging = "180"
+                    },
+                    new SpacingBetweenLines
+                    {
+                        After = "60",
+                        Line = "276",
+                        LineRule =
+                            LineSpacingRuleValues.Auto
+                    }));
+
+            var run =
+                new Run();
+
+            run.Append(
+                new RunProperties(
+                    new FontSize
+                    {
+                        Val = "21"
+                    },
+                    new RunFonts
+                    {
+                        Ascii = "Arial",
+                        HighAnsi = "Arial"
+                    }));
+
+            run.Append(
+                new Text(
+                    $"• {text}")
+                {
+                    Space =
+                        DocumentFormat.OpenXml
+                            .SpaceProcessingModeValues
+                            .Preserve
+                });
+
+            paragraph.Append(run);
+
+            body.Append(paragraph);
+        }
+
+        private static void AddNormalParagraph( Body body, string text)
+        {
+            var paragraph =
+                new Paragraph();
+
+            paragraph.Append(
+                new ParagraphProperties(
+                    new SpacingBetweenLines
+                    {
+                        After = "80",
+                        Line = "276",
+                        LineRule =
+                            LineSpacingRuleValues.Auto
+                    }));
+
+            var run =
+                new Run();
+
+            run.Append(
+                new RunProperties(
+                    new FontSize
+                    {
+                        Val = "21"
+                    },
+                    new RunFonts
+                    {
+                        Ascii = "Arial",
+                        HighAnsi = "Arial"
+                    }));
+
+            run.Append(
+                new Text(text)
+                {
+                    Space =
+                        DocumentFormat.OpenXml
+                            .SpaceProcessingModeValues
+                            .Preserve
+                });
+
+            paragraph.Append(run);
+
+            body.Append(paragraph);
+        }
+
+        private static void AddHeadingParagraph( Body body, string text)
+        {
+            var paragraph =
+                new Paragraph();
+
+            paragraph.Append(
+                new ParagraphProperties(
+                    new SpacingBetweenLines
+                    {
+                        Before = "220",
+                        After = "80"
+                    }));
+
+            var run =
+                new Run();
+
+            run.Append(
+                new RunProperties(
+                    new Bold(),
+                    new FontSize
+                    {
+                        Val = "23"
+                    },
+                    new RunFonts
+                    {
+                        Ascii = "Arial",
+                        HighAnsi = "Arial"
+                    }));
+
+            run.Append(
+                new Text(
+                    text.ToUpperInvariant()));
+
+            paragraph.Append(run);
+
+            body.Append(paragraph);
+        }
+
+        private static void AddPageSettings(Body body)
+        {
+            var sectionProperties =
+                new SectionProperties();
+
+            var pageMargin =
+                new PageMargin
+                {
+                    Top = 720,
+                    Bottom = 720,
+                    Left = 900,
+                    Right = 900
+                };
+
+            sectionProperties.Append(
+                pageMargin);
+
+            body.Append(
+                sectionProperties);
         }
 
         private static void ValidateRequest(
@@ -131,6 +568,144 @@ namespace Dwuma.Services
 
             if (string.IsNullOrWhiteSpace(request.JobTitle))
                 throw new Exception("Job title is required.");
+        }
+
+        public string NormalizeTailoredCvText(
+    string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            string cleaned =
+                text
+                    .Replace("\r\n", "\n")
+                    .Replace("\r", "\n")
+                    .Replace('\u00A0', ' ')
+                    .Trim();
+
+            // Remove Markdown fences if Gemini adds them
+            cleaned =
+                cleaned.Replace(
+                    "```text",
+                    "",
+                    StringComparison.OrdinalIgnoreCase);
+
+            cleaned =
+                cleaned.Replace(
+                    "```markdown",
+                    "",
+                    StringComparison.OrdinalIgnoreCase);
+
+            cleaned =
+                cleaned.Replace(
+                    "```",
+                    "");
+
+            // Reduce excessive spaces
+            cleaned =
+                System.Text.RegularExpressions.Regex
+                    .Replace(
+                        cleaned,
+                        @"[ \t]+",
+                        " ");
+
+            // Maximum of one empty line
+            cleaned =
+                System.Text.RegularExpressions.Regex
+                    .Replace(
+                        cleaned,
+                        @"\n[ \t]*\n[ \t]*\n+",
+                        "\n\n");
+
+            string[] lines =
+                cleaned.Split('\n');
+
+            var result =
+                new List<string>();
+
+            foreach (string rawLine in lines)
+            {
+                string line =
+                    rawLine.Trim();
+
+                // Fix bullets
+                if (line.StartsWith("- "))
+                {
+                    line =
+                        "• " +
+                        line[2..].Trim();
+                }
+                else if (line.StartsWith("* "))
+                {
+                    line =
+                        "• " +
+                        line[2..].Trim();
+                }
+
+                result.Add(line);
+            }
+
+            return string.Join(
+                Environment.NewLine,
+                result)
+                .Trim();
+        }
+
+
+        public string CleanParsedCvText(
+           string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            text = text
+                .Replace("\r\n", "\n")
+                .Replace("\r", "\n")
+                .Replace('\u00A0', ' ');
+
+            string[] rawLines =
+                text.Split('\n');
+
+            var cleanedLines =
+                new List<string>();
+
+            bool previousWasBlank = false;
+
+            foreach (string rawLine in rawLines)
+            {
+                string line =
+                    System.Text.RegularExpressions.Regex
+                        .Replace(
+                            rawLine.Trim(),
+                            @"[ \t]+",
+                            " ");
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    if (!previousWasBlank &&
+                        cleanedLines.Count > 0)
+                    {
+                        cleanedLines.Add(
+                            string.Empty);
+                    }
+
+                    previousWasBlank = true;
+                    continue;
+                }
+
+                cleanedLines.Add(line);
+
+                previousWasBlank = false;
+            }
+
+            return string.Join(
+                Environment.NewLine,
+                cleanedLines)
+                .Trim();
         }
 
         private TailorResponse ParseResponse(string raw)
@@ -258,6 +833,30 @@ namespace Dwuma.Services
     37. Keep each changelog reason under 25 words.
     38. Avoid unnecessary explanations and long introductory text.
 
+    CV FORMATTING RULES:
+
+    39. Return the complete CV content in "tailoredCv".
+    40. Preserve the candidate's name and contact information.
+    41. Put each major CV section heading on its own line.
+    42. Separate major sections using exactly one blank line.
+    43. Use concise bullet points for experience, projects, achievements, and responsibilities.
+    44. Each bullet point must appear on its own line.
+    45. Do not combine multiple experience bullets into a paragraph.
+    46. Keep employer, role, institution, qualification, and date information clearly separated.
+    47. Do not use tables.
+    48. Do not use Markdown headings such as #, ##, or ###.
+    49. Do not use Markdown bold markers such as **.
+    50. Do not use code fences.
+    51. Use these section names when the corresponding information exists:
+        PROFESSIONAL SUMMARY
+        SKILLS
+        WORK EXPERIENCE
+        PROJECTS
+        EDUCATION
+        CERTIFICATIONS
+    52. Do not create a section when the original CV contains no information for that section.
+    53. Preserve readable whitespace and logical section ordering.
+
     JSON OUTPUT RULES:
 
     39. Return only one valid JSON object.
@@ -296,8 +895,7 @@ namespace Dwuma.Services
     RETURN THIS EXACT JSON STRUCTURE:
 
     {
-      "tailoredCv": "Candidate Name\nPROFESSIONAL SUMMARY\nAccurate summary based only on the original CV.\n\nSKILLS\nOnly skills explicitly supported by the original CV.",
-      "atsScore": 0,
+    "tailoredCv": "Candidate Name\nEmail | Phone | Location\n\nPROFESSIONAL SUMMARY\nAccurate professional summary based only on the original CV.\n\nSKILLS\n• Supported skill one\n• Supported skill two\n\nWORK EXPERIENCE\nJob Title | Company | Dates\n• Truthful responsibility from the original CV.\n• Truthful achievement from the original CV.\n\nEDUCATION\nQualification | Institution | Dates"      "atsScore": 0,
       "atsSummary": "A truthful summary explaining the level of alignment between the original CV and the job.",
       "matchedKeywords": [
         "Only keywords explicitly supported by the original CV"

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 namespace Dwuma.Controllers
 {
@@ -16,86 +17,258 @@ namespace Dwuma.Controllers
     {
         private readonly ResumeTailorService _tailorService;
         private readonly ILogger<ResumeTailorController> _logger;
+        private readonly NotificationService _notificationService;
 
-        public ResumeTailorController(ResumeTailorService tailorService, ILogger<ResumeTailorController> logger)
+        public ResumeTailorController(
+            ResumeTailorService tailorService,
+            ILogger<ResumeTailorController> logger,
+            NotificationService notificationService)
         {
             _tailorService = tailorService;
             _logger = logger;
+            _notificationService = notificationService;
         }
+
+        // ==========================================
+        // UPLOAD + PARSE + TAILOR IN ONE ENDPOINT
+        // ==========================================
 
         [HttpPost("tailor")]
-        [ProducesResponseType(typeof(TailorResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Tailor([FromBody] TailorRequest request)
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(
+            typeof(TailorResponse),
+            StatusCodes.Status200OK)]
+        [ProducesResponseType(
+            StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(
+            StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> Tailor(
+            [FromForm] TailorCvRequest request,
+            CancellationToken cancellationToken)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (request.File == null ||
+                request.File.Length == 0)
+            {
+                return BadRequest(new
+                {
+                    message = "Please upload your CV."
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    request.JobTitle))
+            {
+                return BadRequest(new
+                {
+                    message = "Job title is required."
+                });
+            }
 
             try
             {
-                var result = await _tailorService.TailorAsync(request);
+                // 1. Parse uploaded CV
+                string parsedText =
+                    await _tailorService
+                        .ParseCvFileAsync(
+                            request.File);
+
+                if (string.IsNullOrWhiteSpace(
+                        parsedText))
+                {
+                    return BadRequest(new
+                    {
+                        message =
+                            "No readable text could be extracted from the CV."
+                    });
+                }
+
+                // 2. Clean parsed CV text
+                string cleanedCv =
+                    _tailorService
+                        .CleanParsedCvText(
+                            parsedText);
+
+                // 3. Build the existing tailoring request
+                var tailorRequest =
+                    new TailorRequest
+                    {
+                        CvText = cleanedCv,
+                        JobTitle =
+                            request.JobTitle.Trim(),
+
+                        JobDescription =
+                            request.JobDescription?
+                                .Trim(),
+
+                        CompanyName =
+                            request.CompanyName?
+                                .Trim()
+                    };
+
+                // 4. Tailor CV
+                TailorResponse result =
+                    await _tailorService
+                        .TailorAsync(
+                            tailorRequest);
+
+                // 5. Fix spacing/formatting
+                result.TailoredCv =
+                    _tailorService
+                        .NormalizeTailoredCvText(
+                            result.TailoredCv);
+
+                // 6. Create notification
+                int userId = GetUserId();
+
+                await _notificationService
+                    .CreateAsync(
+                        userId,
+                        "Your tailored CV is ready to review and download.",
+                        "CV",
+                        cancellationToken);
+
                 return Ok(result);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error tailoring CV for role: {Role}", request.JobTitle);
-                return StatusCode(500, new { message = "Tailoring failed. Please try again." });
+                _logger.LogError(
+                    ex,
+                    "Error parsing and tailoring CV for role {Role}.",
+                    request.JobTitle);
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new
+                    {
+                        message =
+                            "Could not process your CV. Please try again."
+                    });
             }
         }
 
-        [HttpPost("parse-cv")]
-        [Consumes("multipart/form-data")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> ParseCv([FromForm] ParseCvRequest request)
+        // ==========================================
+        // DOWNLOAD FORMATTED DOCX
+        // ==========================================
+
+        [HttpPost("download")]
+        [ProducesResponseType(
+            typeof(FileContentResult),
+            StatusCodes.Status200OK)]
+        [ProducesResponseType(
+            StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(
+            StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> Download(
+            [FromBody] DownloadRequest request)
         {
-            var file = request.File;
-            if (file == null || file.Length == 0)
-                return BadRequest(new { message = "No file received." });
+            if (string.IsNullOrWhiteSpace(
+                    request.TailoredCv))
+            {
+                return BadRequest(new
+                {
+                    message =
+                        "No CV content provided."
+                });
+            }
 
             try
             {
-                var text = await _tailorService.ParseCvFileAsync(file);
-                return Ok(new { text });
+                request.TailoredCv =
+                    _tailorService
+                        .NormalizeTailoredCvText(
+                            request.TailoredCv);
+
+                byte[] docxBytes =
+                    await _tailorService
+                        .GenerateDocxAsync(
+                            request);
+
+                string safeJobTitle =
+                    string.IsNullOrWhiteSpace(
+                        request.JobTitle)
+                        ? "Tailored"
+                        : request.JobTitle.Trim();
+
+                foreach (char invalidChar
+                         in Path.GetInvalidFileNameChars())
+                {
+                    safeJobTitle =
+                        safeJobTitle.Replace(
+                            invalidChar,
+                            '_');
+                }
+
+                safeJobTitle =
+                    safeJobTitle.Replace(
+                        " ",
+                        "_");
+
+                string fileName =
+                    $"DWUMA_CV_{safeJobTitle}.docx";
+
+                return File(
+                    docxBytes,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    fileName);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "CV parse error.");
-                return StatusCode(500, new { message = "Could not parse the file." });
+                _logger.LogError(
+                    ex,
+                    "DOCX generation failed.");
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new
+                    {
+                        message =
+                            "Could not generate document."
+                    });
             }
         }
 
-        //[HttpPost("download")]
-        //[ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
-        //[ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        //public async Task<IActionResult> Download([FromBody] DownloadRequest request)
-        //{
-        //    if (string.IsNullOrWhiteSpace(request.TailoredCv))
-        //        return BadRequest(new { message = "No CV content provided." });
+        private int GetUserId()
+        {
+            string? value =
+                User.FindFirstValue(
+                    ClaimTypes.NameIdentifier);
 
-        //    try
-        //    {
-        //        var docxBytes = await _tailorService.GenerateDocxAsync(request);
-        //        var fileName = $"CV_{(request.JobTitle ?? "Tailored").Replace(" ", "_")}.docx";
-        //        return File(docxBytes,
-        //            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        //            fileName);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.LogError(ex, "DOCX generation failed.");
-        //        return StatusCode(500, new { message = "Could not generate document." });
-        //    }
-        //}
+            if (!int.TryParse(
+                    value,
+                    out int userId))
+            {
+                throw new UnauthorizedAccessException(
+                    "Unable to identify the current user.");
+            }
+
+            return userId;
+        }
     }
 
-
-    public class ParseCvRequest
+    public sealed class TailorCvRequest
     {
         [Required]
         public IFormFile File { get; set; }
-    }
+            = null!;
 
+        [Required]
+        public string JobTitle { get; set; }
+            = string.Empty;
+
+        public string? JobDescription { get; set; }
+
+        public string? CompanyName { get; set; }
+    }
 }

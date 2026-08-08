@@ -153,6 +153,7 @@ builder.Services.AddScoped<InterviewCoachService>();
 builder.Services.AddScoped<JobMatchService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<NotificationService>();
 
 string[] allowedOrigins =
     builder.Configuration
