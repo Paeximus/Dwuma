@@ -145,6 +145,11 @@ public sealed class SerpApiJobService
                     ?.WorkFromHome
                 ?? false,
 
+            PostedAt =
+                ParsePostedAt(
+                    source.DetectedExtensions?
+                        .PostedAt),
+
             Source =
                 "SerpApi",
 
@@ -155,7 +160,9 @@ public sealed class SerpApiJobService
                 "Active",
 
             DiscoveredAt =
-                DateTime.UtcNow
+                DateTime.UtcNow,
+
+            
         };
     }
 
@@ -274,4 +281,368 @@ public sealed class SerpApiJobService
 
         return jobs;
     }
+
+    public async Task<JobSearchResult> SearchJobsWithPaginationAsync(
+    string query,
+    string location = "Accra, Ghana",
+    string? jobType = null,
+    bool? remote = null,
+    string? nextPageToken = null,
+    CancellationToken cancellationToken = default)
+    {
+        string normalizedQuery =
+            string.IsNullOrWhiteSpace(query)
+                ? "jobs"
+                : query.Trim();
+
+        string normalizedLocation =
+            string.IsNullOrWhiteSpace(location)
+                ? "Accra, Ghana"
+                : location.Trim();
+
+        await MarkExpiredJobsAsync(
+            cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(nextPageToken))
+        {
+            DateTime freshnessCutoff =
+                DateTime.UtcNow.AddHours(-6);
+
+            string[] searchTerms =
+                normalizedQuery.Split(
+                    ' ',
+                    StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries);
+
+            IQueryable<JobListing> cachedQuery =
+                _dbContext.JobListings
+                    .AsNoTracking()
+                    .Where(job =>
+                        job.Source == "SerpApi" &&
+                        job.Status == "Active" &&
+                        job.DiscoveredAt >= freshnessCutoff);
+
+            if (!string.IsNullOrWhiteSpace(normalizedLocation) && remote != true)
+            {
+                cachedQuery =
+                    cachedQuery.Where(job =>
+                        job.Location == null ||
+                        job.Location.Contains(
+                            normalizedLocation) ||
+                        normalizedLocation.Contains(
+                            job.Location));
+            }
+
+            // Location filter
+            if (!string.IsNullOrWhiteSpace(
+                    normalizedLocation))
+            {
+                cachedQuery =
+                    cachedQuery.Where(job =>
+                        job.Location == null ||
+                        job.Location.Contains(
+                            normalizedLocation) ||
+                        normalizedLocation.Contains(
+                            job.Location));
+            }
+
+            // Job type filter
+            if (!string.IsNullOrWhiteSpace(
+                    jobType))
+            {
+                string normalizedJobType =
+                    jobType.Trim();
+
+                cachedQuery =
+                    cachedQuery.Where(job =>
+                        job.JobType != null &&
+                        job.JobType.Contains(
+                            normalizedJobType));
+            }
+
+            // Remote filter
+            if (remote.HasValue)
+            {
+                cachedQuery =
+                    cachedQuery.Where(job =>
+                        job.IsRemote ==
+                        remote.Value);
+            }
+
+            foreach (string term in searchTerms)
+            {
+                string searchTerm = term;
+
+                cachedQuery =
+                    cachedQuery.Where(job =>
+                        job.Title.Contains(searchTerm) ||
+                        (
+                            job.Description != null &&
+                            job.Description.Contains(searchTerm)
+                        ));
+            }
+
+            List<JobListing> cachedJobs =
+                await cachedQuery
+                    .OrderByDescending(job =>
+                        job.DiscoveredAt)
+                    .Take(20)
+                    .ToListAsync(
+                        cancellationToken);
+
+            if (cachedJobs.Count > 0)
+            {
+                _logger.LogInformation(
+                    "Returning {Count} cached jobs for {Query}.",
+                    cachedJobs.Count,
+                    normalizedQuery);
+
+                return new JobSearchResult
+                {
+                    Jobs = cachedJobs,
+                    NextPageToken = null,
+                    FromCache = true
+                };
+            }
+        }
+
+        SerpApiResponse apiResponse =
+            await SearchJobsAsync(
+                normalizedQuery,
+                normalizedLocation,
+                nextPageToken,
+                cancellationToken);
+
+        List<JobListing> mappedJobs =
+            apiResponse.JobsResults
+                .Where(job =>
+                    !string.IsNullOrWhiteSpace(job.Title))
+                .Select(MapToJobListing)
+                .ToList();
+
+        mappedJobs =ApplyJobFilters(
+                mappedJobs,
+                normalizedLocation,
+                jobType,
+                remote);
+
+        foreach (JobListing job in mappedJobs)
+        {
+            if (string.IsNullOrWhiteSpace(job.ExternalId))
+            {
+                continue;
+            }
+
+            JobListing? existingJob =
+                await _dbContext.JobListings
+                    .FirstOrDefaultAsync(
+                        existing =>
+                            existing.Source == "SerpApi" &&
+                            existing.ExternalId == job.ExternalId,
+                        cancellationToken);
+
+            if (existingJob == null)
+            {
+                _dbContext.JobListings.Add(job);
+            }
+            else
+            {
+                existingJob.Title = job.Title;
+                existingJob.Company = job.Company;
+                existingJob.Location = job.Location;
+                existingJob.Description = job.Description;
+                existingJob.JobType = job.JobType;
+                existingJob.IsRemote = job.IsRemote;
+                existingJob.SourceUrl = job.SourceUrl;
+                existingJob.Status = "Active";
+                existingJob.DiscoveredAt = DateTime.UtcNow;
+                existingJob.PostedAt = job.PostedAt;
+            }
+        }
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        return new JobSearchResult
+        {
+            Jobs = mappedJobs,
+
+            NextPageToken =
+                apiResponse.SerpApiPagination?
+                    .NextPageToken,
+
+            FromCache = false
+        };
+    }
+
+    public async Task<JobListing?> GetJobByIdAsync(
+    int id,
+    CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.JobListings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                job => job.Id == id && job.Status == "Active",
+                cancellationToken);
+    }
+
+    public async Task<int> MarkExpiredJobsAsync(
+    CancellationToken cancellationToken = default)
+    {
+        DateTime now = DateTime.UtcNow;
+
+        List<JobListing> expiredJobs =
+            await _dbContext.JobListings
+                .Where(job =>
+                    job.Status == "Active" &&
+                    (
+                        (job.ExpiresAt != null &&
+                         job.ExpiresAt <= now)
+                        ||
+                        (
+                            job.ExpiresAt == null &&
+                            job.DiscoveredAt <= now.AddDays(-30)
+                        )
+                    ))
+                .ToListAsync(
+                    cancellationToken);
+
+        if (expiredJobs.Count == 0)
+        {
+            return 0;
+        }
+
+        foreach (JobListing job in expiredJobs)
+        {
+            job.Status = "Expired";
+        }
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Marked {Count} jobs as expired.",
+            expiredJobs.Count);
+
+        return expiredJobs.Count;
+    }
+
+    private static DateTime? ParsePostedAt(
+    string? postedAt)
+    {
+        if (string.IsNullOrWhiteSpace(postedAt))
+        {
+            return null;
+        }
+
+        string value =
+            postedAt.Trim()
+                .ToLowerInvariant();
+
+        DateTime now =
+            DateTime.UtcNow;
+
+        if (value.Contains("today") ||
+            value.Contains("just posted"))
+        {
+            return now;
+        }
+
+        if (value.Contains("yesterday"))
+        {
+            return now.AddDays(-1);
+        }
+
+        var match =
+            System.Text.RegularExpressions.Regex.Match(
+                value,
+                @"(\d+)\+?\s*(minute|minutes|hour|hours|day|days|week|weeks|month|months)");
+
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(
+                match.Groups[1].Value,
+                out int amount))
+        {
+            return null;
+        }
+
+        string unit =
+            match.Groups[2].Value;
+
+        return unit switch
+        {
+            "minute" or "minutes" =>
+                now.AddMinutes(-amount),
+
+            "hour" or "hours" =>
+                now.AddHours(-amount),
+
+            "day" or "days" =>
+                now.AddDays(-amount),
+
+            "week" or "weeks" =>
+                now.AddDays(-(amount * 7)),
+
+            "month" or "months" =>
+                now.AddMonths(-amount),
+
+            _ => null
+        };
+    }
+
+    private static List<JobListing> ApplyJobFilters(
+    IEnumerable<JobListing> jobs,
+    string? location,
+    string? jobType,
+    bool? remote)
+    {
+        IEnumerable<JobListing> filtered =
+            jobs;
+
+        if (!string.IsNullOrWhiteSpace(location) && remote != true)
+        {
+            string normalizedLocation =
+                location.Trim();
+
+            filtered =
+                filtered.Where(job =>
+                    string.IsNullOrWhiteSpace(
+                        job.Location) ||
+                    job.Location.Contains(
+                        normalizedLocation,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    normalizedLocation.Contains(
+                        job.Location,
+                        StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(jobType))
+        {
+            string normalizedJobType =
+                jobType.Trim();
+
+            filtered =
+                filtered.Where(job =>
+                    !string.IsNullOrWhiteSpace(
+                        job.JobType) &&
+                    job.JobType.Contains(
+                        normalizedJobType,
+                        StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (remote.HasValue)
+        {
+            filtered =
+                filtered.Where(job =>
+                    job.IsRemote ==
+                    remote.Value);
+        }
+
+        return filtered.ToList();
+    }
+
 }

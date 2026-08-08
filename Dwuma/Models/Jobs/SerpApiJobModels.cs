@@ -8,7 +8,7 @@ public sealed class SerpApiResponse
     public List<SerpApiJob> JobsResults { get; set; } = [];
 
     [JsonPropertyName("serpapi_pagination")]
-    public SerpApiPagination? Pagination { get; set; }
+    public SerpApiPagination? SerpApiPagination { get; set; }
 }
 
 public sealed class SerpApiJob

@@ -610,33 +610,28 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "default": "Ghana"
+              "default": "Accra, Ghana"
             }
           },
           {
-            "name": "page",
+            "name": "jobType",
             "in": "query",
             "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 1
+              "type": "string"
             }
           },
           {
-            "name": "pageSize",
+            "name": "remote",
             "in": "query",
             "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
+              "type": "boolean"
             }
           },
           {
-            "name": "companySearch",
+            "name": "nextPageToken",
             "in": "query",
             "schema": {
-              "type": "boolean",
-              "default": false
+              "type": "string"
             }
           }
         ],
@@ -646,17 +641,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                  "$ref": "#/components/schemas/JobSearchResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                  "$ref": "#/components/schemas/JobSearchResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                  "$ref": "#/components/schemas/JobSearchResult"
                 }
               }
             }
@@ -684,44 +679,19 @@
         }
       }
     },
-    "/api/jobs/ghana": {
+    "/api/jobs/{id}": {
       "get": {
         "tags": [
           "Jobs"
         ],
         "parameters": [
           {
-            "name": "keywords",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "jobs"
-            }
-          },
-          {
-            "name": "location",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "Ghana"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
+              "format": "int32"
             }
           }
         ],
@@ -731,17 +701,37 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                  "$ref": "#/components/schemas/JobListing"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                  "$ref": "#/components/schemas/JobListing"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
+                  "$ref": "#/components/schemas/JobListing"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -773,71 +763,6 @@
             }
           }
         },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GhanaJobSearchResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/careerjet": {
-      "get": {
-        "tags": [
-          "Jobs"
-        ],
-        "parameters": [
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "jobs"
-            }
-          },
-          {
-            "name": "location",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "Ghana"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1265,62 +1190,6 @@
           },
           "500": {
             "description": "Internal Server Error"
-          }
-        }
-      }
-    },
-    "/api/jobs/serpapi-test": {
-      "get": {
-        "tags": [
-          "SerpApiTest"
-        ],
-        "parameters": [
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "software engineer"
-            }
-          },
-          {
-            "name": "location",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "Accra, Ghana"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/JobListing"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/JobListing"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/JobListing"
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -2170,6 +2039,30 @@
           "applicationAdvice": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "JobSearchResult": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobListing"
+            },
+            "nullable": true
+          },
+          "nextPageToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasMore": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "fromCache": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
