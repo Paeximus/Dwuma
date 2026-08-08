@@ -1462,6 +1462,10 @@
             "type": "string",
             "nullable": true
           },
+          "notice": {
+            "type": "string",
+            "nullable": true
+          },
           "questions": {
             "type": "array",
             "items": {

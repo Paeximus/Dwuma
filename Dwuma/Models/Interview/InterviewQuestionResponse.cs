@@ -6,6 +6,8 @@ public sealed class InterviewQuestionResponse
 
     public string CompanyName { get; set; } = string.Empty;
 
+    public string? Notice { get; set; }
+
     public List<InterviewQuestionItem> Questions { get; set; } = [];
 }
 

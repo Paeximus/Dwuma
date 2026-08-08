@@ -25,19 +25,42 @@ public sealed class InterviewCoachService
     {
         ValidateQuestionRequest(request);
 
-        request.NumberOfQuestions = Math.Clamp(
-            request.NumberOfQuestions,
-            1,
-            10);
+        if (!IsAllowedInterviewRole(
+                request.JobTitle,
+                request.JobDescription))
+        {
+            return new InterviewQuestionResponse
+            {
+                JobTitle =
+                    request.JobTitle,
 
-        string prompt = BuildQuestionPrompt(request);
+                CompanyName =
+                    request.CompanyName ?? string.Empty,
+
+                Notice =
+                    "Interview preparation is not available for illegal or harmful job roles.",
+
+                Questions = []
+            };
+        }
+
+        request.NumberOfQuestions =
+            Math.Clamp(
+                request.NumberOfQuestions,
+                1,
+                10);
+
+        string prompt =
+            BuildQuestionPrompt(request);
 
         string rawJson =
             await _geminiService.GenerateJsonAsync(
                 prompt,
-                responseSchema: CreateQuestionSchema(),
+                responseSchema:
+                    CreateQuestionSchema(),
                 maxOutputTokens: 4000,
-                cancellationToken: cancellationToken);
+                cancellationToken:
+                    cancellationToken);
 
         return ParseJson<InterviewQuestionResponse>(
             rawJson,
@@ -86,10 +109,6 @@ public sealed class InterviewCoachService
             throw new ArgumentException(
                 "The job title is required.");
         }
-
-        ValidateInterviewSafety(
-            request.JobTitle,
-            request.JobDescription);
     }
 
     private static void ValidateAnswerRequest(
@@ -323,6 +342,59 @@ public sealed class InterviewCoachService
             "Return valid JSON only.");
 
         return prompt.ToString();
+    }
+
+    private static bool IsAllowedInterviewRole(
+    string? jobTitle,
+    string? jobDescription = null)
+    {
+        string combined =
+            $"{jobTitle} {jobDescription}"
+                .Trim()
+                .ToLowerInvariant();
+
+        string[] prohibitedTerms =
+        [
+            "meth production",
+        "meth producer",
+        "meth manufacturer",
+        "meth lab",
+        "cook meth",
+        "cocaine production",
+        "cocaine manufacturer",
+        "drug trafficking",
+        "drug trafficker",
+        "illegal drug manufacturing",
+
+        "hitman",
+        "contract killer",
+        "assassin for hire",
+        "murder for hire",
+
+        "human trafficker",
+        "human trafficking",
+        "sex trafficking",
+
+        "bomb maker",
+        "bomb making",
+        "illegal arms dealer",
+        "illegal weapons dealer",
+
+        "credit card fraud",
+        "identity theft",
+        "fraud operator",
+        "scam operator",
+
+        "ransomware operator",
+        "malware for theft",
+        "phishing scammer",
+        "credential thief"
+        ];
+
+        return !prohibitedTerms.Any(term =>
+            combined.Contains(
+                term,
+                StringComparison.OrdinalIgnoreCase));
     }
 
     private T ParseJson<T>(
