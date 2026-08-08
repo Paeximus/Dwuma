@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace Dwuma.Models.Data.DwumaContext;
 
@@ -7,7 +8,6 @@ public partial class JobListing
 {
     public int Id { get; set; }
 
-    // Identifier supplied by Jooble or another provider
     public string? ExternalId { get; set; }
 
     public string Title { get; set; } = string.Empty;

@@ -128,6 +128,11 @@ builder.Services.AddHttpClient<GeminiService>(client =>
     client.Timeout = TimeSpan.FromMinutes(3);
 });
 
+builder.Services.AddHttpClient<SerpApiJobService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.AddHttpClient<JobSearchService>(
     client =>
     {

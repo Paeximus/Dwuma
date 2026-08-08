@@ -1122,6 +1122,62 @@
         }
       }
     },
+    "/api/jobs/serpapi-test": {
+      "get": {
+        "tags": [
+          "SerpApiTest"
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "software engineer"
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "Accra, Ghana"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobListing"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobListing"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobListing"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/SkillsGap/analyse": {
       "post": {
         "tags": [
@@ -1176,6 +1232,56 @@
   },
   "components": {
     "schemas": {
+      "Application": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobListingId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cvDocumentId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "autoSubmitted": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cvDocument": {
+            "$ref": "#/components/schemas/CvDocument"
+          },
+          "jobListing": {
+            "$ref": "#/components/schemas/JobListing"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
       "AuthResponse": {
         "type": "object",
         "properties": {
@@ -1216,6 +1322,63 @@
           "reason": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CvDocument": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobListingId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "filePath": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileType": {
+            "type": "string",
+            "nullable": true
+          },
+          "isBaseCv": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "changelog": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "applications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Application"
+            },
+            "nullable": true
+          },
+          "jobListing": {
+            "$ref": "#/components/schemas/JobListing"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
           }
         },
         "additionalProperties": false
@@ -1395,6 +1558,49 @@
         },
         "additionalProperties": false
       },
+      "InterviewQa": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sessionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "question": {
+            "type": "string",
+            "nullable": true
+          },
+          "userResponse": {
+            "type": "string",
+            "nullable": true
+          },
+          "responseMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "score": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "feedback": {
+            "type": "string",
+            "nullable": true
+          },
+          "questionOrder": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "session": {
+            "$ref": "#/components/schemas/InterviewSession"
+          }
+        },
+        "additionalProperties": false
+      },
       "InterviewQuestionItem": {
         "type": "object",
         "properties": {
@@ -1470,6 +1676,234 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/InterviewQuestionItem"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InterviewSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobListingId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "company": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "interviewQas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InterviewQa"
+            },
+            "nullable": true
+          },
+          "jobListing": {
+            "$ref": "#/components/schemas/JobListing"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "JobInteraction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobListingId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "clicked": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "boolean"
+          },
+          "dismissed": {
+            "type": "boolean"
+          },
+          "skillMatch": {
+            "type": "number",
+            "format": "float"
+          },
+          "locationMatch": {
+            "type": "number",
+            "format": "float"
+          },
+          "experienceMatch": {
+            "type": "number",
+            "format": "float"
+          },
+          "industryMatch": {
+            "type": "number",
+            "format": "float"
+          },
+          "salaryMatch": {
+            "type": "number",
+            "format": "float"
+          },
+          "jobAgeDays": {
+            "type": "number",
+            "format": "float"
+          },
+          "rating": {
+            "type": "number",
+            "format": "float"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "jobListing": {
+            "$ref": "#/components/schemas/JobListing"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "JobListing": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "externalId": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "company": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "jobType": {
+            "type": "string",
+            "nullable": true
+          },
+          "industry": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiredSkills": {
+            "type": "string",
+            "nullable": true
+          },
+          "salary": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRemote": {
+            "type": "boolean"
+          },
+          "relevanceScore": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "discoveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "applications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Application"
+            },
+            "nullable": true
+          },
+          "cvDocuments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CvDocument"
+            },
+            "nullable": true
+          },
+          "interviewSessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InterviewSession"
+            },
+            "nullable": true
+          },
+          "jobInteractions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobInteraction"
             },
             "nullable": true
           }
@@ -1615,6 +2049,104 @@
         },
         "additionalProperties": false
       },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "notificationType": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "wasEngaged": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "notificationEngagements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationEngagement"
+            },
+            "nullable": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NotificationEngagement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notificationId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dayOfWeek": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "hourOfDay": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "engaged": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "notification": {
+            "$ref": "#/components/schemas/Notification"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OnboardingStatus": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -1641,6 +2173,69 @@
           }
         },
         "additionalProperties": { }
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "institution": {
+            "type": "string",
+            "nullable": true
+          },
+          "degree": {
+            "type": "string",
+            "nullable": true
+          },
+          "fieldOfStudy": {
+            "type": "string",
+            "nullable": true
+          },
+          "graduationYear": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "gpaClassification": {
+            "type": "string",
+            "nullable": true
+          },
+          "preferredIndustries": {
+            "type": "string",
+            "nullable": true
+          },
+          "jobTypePreference": {
+            "type": "string",
+            "nullable": true
+          },
+          "locationPreference": {
+            "type": "string",
+            "nullable": true
+          },
+          "salaryExpectation": {
+            "type": "string",
+            "nullable": true
+          },
+          "careerGoals": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
       },
       "ProfileRequest": {
         "required": [
@@ -1818,6 +2413,110 @@
         },
         "additionalProperties": false
       },
+      "Skill": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skillName": {
+            "type": "string",
+            "nullable": true
+          },
+          "skillType": {
+            "type": "string",
+            "nullable": true
+          },
+          "proficiencyLevel": {
+            "type": "string",
+            "nullable": true
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkillGapItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reportId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skillName": {
+            "type": "string",
+            "nullable": true
+          },
+          "gapStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiredLevel": {
+            "type": "string",
+            "nullable": true
+          },
+          "resourceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "resourceUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "report": {
+            "$ref": "#/components/schemas/SkillGapReport"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkillGapReport": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "careerPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "skillGapItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillGapItem"
+            },
+            "nullable": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
       "SkillItem": {
         "type": "object",
         "properties": {
@@ -1955,6 +2654,126 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ChangeLogItem"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "passwordHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "jwtToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "applications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Application"
+            },
+            "nullable": true
+          },
+          "cvDocuments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CvDocument"
+            },
+            "nullable": true
+          },
+          "interviewSessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InterviewSession"
+            },
+            "nullable": true
+          },
+          "jobInteractions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobInteraction"
+            },
+            "nullable": true
+          },
+          "notificationEngagements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationEngagement"
+            },
+            "nullable": true
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            },
+            "nullable": true
+          },
+          "profile": {
+            "$ref": "#/components/schemas/Profile"
+          },
+          "isEmailVerified": {
+            "type": "boolean"
+          },
+          "emailVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "emailVerificationTokenHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "emailVerificationExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "onboardingStatus": {
+            "$ref": "#/components/schemas/OnboardingStatus"
+          },
+          "onboardingCompletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "skillGapReports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillGapReport"
+            },
+            "nullable": true
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Skill"
             },
             "nullable": true
           }
