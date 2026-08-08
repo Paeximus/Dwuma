@@ -84,11 +84,11 @@ public sealed class InterviewCoachController : ControllerBase
 
             int userId = GetUserId();
 
-            await _notificationService.CreateAsync(
-                userId,
-                "Your interview feedback and score are ready to review.",
-                "Interview",
-                cancellationToken);
+            await _notificationService.CreatePersonalizedAsync(
+                    userId,
+                    "Interview",
+                    $"you scored {response.Score}% in your {request.JobTitle} interview practice. Review your feedback to improve your next attempt.",
+                    cancellationToken);
 
             return Ok(response);
         }

@@ -45,10 +45,10 @@ namespace Dwuma.Controllers
                 var result = await _skillsGapService.AnalyseAsync(request);
 
                 int userId = GetUserId();
-                await _notificationService.CreateAsync(
+                await _notificationService.CreatePersonalizedAsync(
                     userId,
-                    "Your skills gap analysis is ready to review.",
-                    "Skills Gap Analysis",
+                    "Skills",
+                    $"your skills analysis for {request.JobTitle} is ready. Review the skills you already have and the gaps you can work on.",
                     CancellationToken.None);
 
                 return Ok(result);

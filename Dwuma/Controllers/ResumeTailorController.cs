@@ -125,12 +125,11 @@ namespace Dwuma.Controllers
                 // 6. Create notification
                 int userId = GetUserId();
 
-                await _notificationService
-                    .CreateAsync(
-                        userId,
-                        "Your tailored CV is ready to review and download.",
-                        "CV",
-                        cancellationToken);
+                await _notificationService.CreatePersonalizedAsync(
+                     userId,
+                     "CV",
+                     $"your CV for {request.JobTitle} has been tailored and is ready to download.",
+                     cancellationToken);
 
                 return Ok(result);
             }

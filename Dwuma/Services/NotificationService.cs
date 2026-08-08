@@ -227,26 +227,97 @@ public sealed class NotificationService
     // =========================================================
 
     private static string GetNotificationTitle(
-        string? notificationType)
+    string? notificationType)
     {
         return notificationType?
             .Trim()
             .ToLowerInvariant() switch
         {
             "jobs" =>
-                "New job update",
+                "New job matches",
 
             "interview" =>
-                "Interview update",
+                "Interview feedback ready",
 
             "cv" =>
-                "CV update",
+                "Your tailored CV is ready",
 
             "skills" =>
-                "Skills update",
+                "Skills analysis ready",
 
             _ =>
-                "DWUMA notification"
+                "DWUMA update"
         };
+    }
+
+    public async Task<Notification> CreatePersonalizedAsync(
+    int userId,
+    string notificationType,
+    string message,
+    CancellationToken cancellationToken = default)
+    {
+        User? user =
+            await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    u => u.Id == userId,
+                    cancellationToken);
+
+        if (user == null)
+        {
+            throw new KeyNotFoundException(
+                "User was not found.");
+        }
+
+        string fullName =
+            user.FullName?.Trim()
+            ?? string.Empty;
+
+        string firstName =
+            string.IsNullOrWhiteSpace(fullName)
+                ? "there"
+                : fullName
+                    .Split(
+                        ' ',
+                        StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault()
+                    ?? "there";
+
+        string personalizedContent =
+            $"{firstName}, {message}";
+
+        var notification =
+            new Notification
+            {
+                UserId = userId,
+
+                Content =
+                    personalizedContent,
+
+                NotificationType =
+                    notificationType,
+
+                ScheduledAt =
+                    DateTime.UtcNow,
+
+                SentAt =
+                    DateTime.UtcNow,
+
+                WasEngaged =
+                    false
+            };
+
+        _dbContext.Notifications.Add(
+            notification);
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Created personalized {NotificationType} notification for user {UserId}.",
+            notificationType,
+            userId);
+
+        return notification;
     }
 }
