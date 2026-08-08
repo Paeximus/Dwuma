@@ -154,6 +154,7 @@ builder.Services.AddScoped<JobMatchService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<DashboardService>();
 
 string[] allowedOrigins =
     builder.Configuration
