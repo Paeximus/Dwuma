@@ -384,6 +384,21 @@ public sealed class InterviewCoachController : ControllerBase
                         "The interview recording could not be transcribed."
                 });
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Unexpected video interview failure for session {SessionId}.",
+                request.SessionId);
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    message = ex.Message,
+                    exceptionType = ex.GetType().Name
+                });
+        }
     }
 
     [HttpPost("sessions/{sessionId:int}/complete")]
