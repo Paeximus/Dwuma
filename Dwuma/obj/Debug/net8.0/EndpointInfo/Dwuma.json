@@ -2347,15 +2347,15 @@
       },
       "LoginRequest": {
         "required": [
-          "email",
+          "login",
           "password"
         ],
         "type": "object",
         "properties": {
-          "email": {
+          "login": {
+            "maxLength": 255,
             "minLength": 1,
-            "type": "string",
-            "format": "email"
+            "type": "string"
           },
           "password": {
             "minLength": 1,

@@ -91,8 +91,8 @@ public sealed class AuthController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             _logger.LogWarning(
-                "Failed login attempt for {Email}.",
-                request.Email);
+                "Failed login attempt for {Login}.",
+                request.Login);
 
             return Unauthorized(new
             {

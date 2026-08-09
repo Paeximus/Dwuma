@@ -493,6 +493,7 @@ public partial class DwumaContext : DbContext
             entity.ToTable("USERS");
 
             entity.HasIndex(e => e.Email, "UQ__USERS__AB6E6164B26437FC").IsUnique();
+            entity.HasIndex(e => e.FullName, "UQ_USERS_FULL_NAME").IsUnique();
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
@@ -508,6 +509,7 @@ public partial class DwumaContext : DbContext
                 .HasMaxLength(255)
                 .IsUnicode(false)
                 .HasColumnName("email");
+
             entity.Property(e => e.FullName)
                 .HasMaxLength(255)
                 .IsUnicode(false)

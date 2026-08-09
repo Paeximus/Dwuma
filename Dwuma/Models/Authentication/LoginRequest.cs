@@ -5,8 +5,8 @@ namespace Dwuma.Models.Authentication;
 public sealed class LoginRequest
 {
     [Required]
-    [EmailAddress]
-    public string Email { get; set; } = string.Empty;
+    [MaxLength(255)]
+    public string Login { get; set; } = string.Empty;
 
     [Required]
     public string Password { get; set; } = string.Empty;

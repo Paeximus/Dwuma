@@ -36,18 +36,46 @@ public sealed class AuthService
     }
 
     public async Task<RegisterResponse> RegisterAsync(
-        RegisterRequest request,
-        CancellationToken cancellationToken = default)
+    RegisterRequest request,
+    CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (string.IsNullOrWhiteSpace(request.Username))
+        {
+            throw new ArgumentException(
+                "Username is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            throw new ArgumentException(
+                "Email is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+        {
+            throw new ArgumentException(
+                "Password is required.");
+        }
+
         string email =
             request.Email
                 .Trim()
                 .ToLowerInvariant();
 
+        string username =
+            request.Username
+                .Trim();
+
+        string normalizedUsername =
+            username.ToLowerInvariant();
+
         bool emailExists =
             await _context.Users
                 .AnyAsync(
-                    user => user.Email == email,
+                    user =>
+                        user.Email.ToLower() == email,
                     cancellationToken);
 
         if (emailExists)
@@ -56,25 +84,33 @@ public sealed class AuthService
                 "An account with this email already exists.");
         }
 
-        var user = new User
+        bool usernameExists =
+            await _context.Users
+                .AnyAsync(
+                    user =>
+                        user.FullName.ToLower() ==
+                        normalizedUsername,
+                    cancellationToken);
+
+        if (usernameExists)
         {
-            FullName = request.Username.Trim(),
-            Email = email.Trim().ToLowerInvariant(),
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-             IsEmailVerified = false,
-            EmailVerifiedAt = null,
-
-            OnboardingStatus = OnboardingStatus.NotStarted,
-
-            OnboardingCompletedAt = null,
-
-        };
-        if (string.IsNullOrWhiteSpace(request.Username))
-        {
-            throw new ArgumentException(
-                "Username is required.");
+            throw new InvalidOperationException(
+                "This username is already taken. Please choose another username.");
         }
+
+        var user =
+            new User
+            {
+                FullName = username,
+                Email = email,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                IsEmailVerified = false,
+                EmailVerifiedAt = null,
+                OnboardingStatus =
+                    OnboardingStatus.NotStarted,
+                OnboardingCompletedAt = null
+            };
 
         user.PasswordHash =
             _passwordHasher.HashPassword(
@@ -82,8 +118,6 @@ public sealed class AuthService
                 request.Password);
 
         _context.Users.Add(user);
-        
-        
 
         int savedRows =
             await _context.SaveChangesAsync(
@@ -93,11 +127,17 @@ public sealed class AuthService
             GenerateEmailVerificationToken();
 
         string hashedToken =
-            HashVerificationToken(emailVerificationToken);
+            HashVerificationToken(
+                emailVerificationToken);
 
-        user.EmailVerificationTokenHash = hashedToken;
+        user.EmailVerificationTokenHash =
+            hashedToken;
+
         user.EmailVerificationExpiresAt =
             DateTime.UtcNow.AddMinutes(30);
+
+        await _context.SaveChangesAsync(
+            cancellationToken);
 
         string frontendBaseUrl =
             _configuration[
@@ -110,8 +150,8 @@ public sealed class AuthService
             $"?token={Uri.EscapeDataString(emailVerificationToken)}" +
             $"&email={Uri.EscapeDataString(user.Email)}";
 
-
-        bool verificationEmailSent = false;
+        bool verificationEmailSent =
+            false;
 
         try
         {
@@ -119,13 +159,14 @@ public sealed class AuthService
                 "Sending verification email to {Email}.",
                 user.Email);
 
+            await _emailService
+                .SendVerificationEmailAsync(
+                    user.Email,
+                    verificationLink,
+                    cancellationToken);
 
-            await _emailService.SendVerificationEmailAsync(
-                user.Email,
-                verificationLink,
-                cancellationToken);
-
-            verificationEmailSent = true;
+            verificationEmailSent =
+                true;
         }
         catch (Exception exception)
         {
@@ -135,16 +176,9 @@ public sealed class AuthService
                 user.Email);
         }
 
-
         _logger.LogInformation(
             "Registration saved {SavedRows} row(s). User ID: {UserId}",
             savedRows,
-            user.Id);
-
-        GeneratedToken generatedToken = _jwtTokenService.CreateToken(user);
-
-        _logger.LogInformation(
-            "New user registered with ID {UserId}.",
             user.Id);
 
         return new RegisterResponse
@@ -153,36 +187,50 @@ public sealed class AuthService
             Email = user.Email,
 
             VerificationEmailSent =
-        verificationEmailSent,
+                verificationEmailSent,
 
             Message =
-        verificationEmailSent
-            ? "Account created. Check your email to verify your account."
-            : "Account created, but the verification email could not be sent. Use resend verification."
+                verificationEmailSent
+                    ? "Account created. Check your email to verify your account."
+                    : "Account created, but the verification email could not be sent. Use resend verification."
         };
-
     }
 
     public async Task<AuthResponse> LoginAsync(
-        LoginRequest request,
-        CancellationToken cancellationToken = default)
+    LoginRequest request,
+    CancellationToken cancellationToken = default)
     {
-        string email =
-            request.Email
-                .Trim()
-                .ToLowerInvariant();
+        ArgumentNullException.ThrowIfNull(request);
 
-        User? user =
+        if (string.IsNullOrWhiteSpace(request.Login))
+        {
+            throw new ArgumentException(
+                "Email or username is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+        {
+            throw new ArgumentException(
+                "Password is required.");
+        }
+
+        string normalizedLogin =
+            request.Login
+                .Trim()
+                .ToLower();
+
+        var user =
             await _context.Users
-                .SingleOrDefaultAsync(
-                    existingUser =>
-                        existingUser.Email == email,
+                .FirstOrDefaultAsync(
+                    u =>
+                        u.Email.ToLower() == normalizedLogin ||
+                        u.FullName.ToLower() == normalizedLogin,
                     cancellationToken);
 
         if (user is null)
         {
             throw new UnauthorizedAccessException(
-                "Invalid email or password.");
+                "Invalid email, username or password.");
         }
 
         if (string.IsNullOrWhiteSpace(user.PasswordHash))
@@ -197,25 +245,19 @@ public sealed class AuthService
                 user.PasswordHash,
                 request.Password);
 
-        if (result ==
-            PasswordVerificationResult.Failed)
+        if (result == PasswordVerificationResult.Failed)
         {
             throw new UnauthorizedAccessException(
-                "Invalid email or password.");
+                "Invalid email, username or password.");
         }
 
-        if (result ==
-            PasswordVerificationResult
-                .SuccessRehashNeeded)
+        if (!user.IsEmailVerified)
         {
-            user.PasswordHash =
-                _passwordHasher.HashPassword(
-                    user,
-                    request.Password);
+            throw new InvalidOperationException(
+                "Verify your email before logging in.");
         }
 
-        GeneratedToken generatedToken = _jwtTokenService.CreateToken(user);
-
+        // Update the stored hash if ASP.NET recommends rehashing it.
         if (result ==
             PasswordVerificationResult.SuccessRehashNeeded)
         {
@@ -231,11 +273,8 @@ public sealed class AuthService
                 cancellationToken);
         }
 
-        if (!user.IsEmailVerified)
-        {
-            throw new InvalidOperationException(
-                "Verify your email before logging in.");
-        }
+        GeneratedToken generatedToken =
+            _jwtTokenService.CreateToken(user);
 
         _logger.LogInformation(
             "User {UserId} logged in.",
@@ -247,17 +286,15 @@ public sealed class AuthService
     }
 
     private static AuthResponse MapResponse(
-        User user,
-        GeneratedToken generatedToken)
+    User user,
+    GeneratedToken generatedToken)
     {
         return new AuthResponse
         {
             UserId = user.Id,
-            //FullName = user.FullName,
             Email = user.Email,
             Token = generatedToken.Value,
-            ExpiresAt =
-                generatedToken.ExpiresAt
+            ExpiresAt = generatedToken.ExpiresAt
         };
     }
 

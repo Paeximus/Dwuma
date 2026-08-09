@@ -342,6 +342,29 @@ builder.Services.Configure<ForwardedHeadersOptions>(
 
 var app = builder.Build();
 
+//using (var scope = app.Services.CreateScope())
+//{
+//    var dbContext =
+//        scope.ServiceProvider
+//            .GetRequiredService<DwumaContext>();
+
+//    try
+//    {
+//        await dbContext.Database.ExecuteSqlRawAsync(
+//            """
+//           SELECT * FROM USERS;
+//            """);
+
+//        Console.WriteLine(
+//            "Unique username constraint created.");
+//    }
+//    catch (Exception ex)
+//    {
+//        Console.WriteLine(
+//            $"Unique username constraint skipped: {ex.Message}");
+//    }
+//}
+
 app.UseForwardedHeaders();
 
 app.UseSwagger();
