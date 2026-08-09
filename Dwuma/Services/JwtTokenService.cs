@@ -31,15 +31,14 @@ public sealed class JwtTokenService
             _configuration["Jwt:Audience"]
             ?? "DwumaFrontend";
 
-        int expiryMinutes =
+        int expiryDays =
             _configuration.GetValue(
-                "Jwt:ExpiryMinutes",
-                10080);
+                "Jwt:ExpiryDays",
+                1);
 
         DateTime expiresAt =
-            DateTime.UtcNow.AddMinutes(
-                expiryMinutes);
-
+            DateTime.UtcNow.AddDays(
+                expiryDays);
         Claim[] claims =
         [
             new Claim(

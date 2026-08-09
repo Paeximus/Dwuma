@@ -340,6 +340,16 @@ builder.Services.Configure<ForwardedHeadersOptions>(
         options.KnownProxies.Clear();
     });
 
+builder.Services.Configure<
+    Microsoft.AspNetCore.Http.Features
+        .FormOptions>(
+    options =>
+    {
+        options.MultipartBodyLengthLimit =
+            200_000_000;
+    });
+
+
 var app = builder.Build();
 
 //using (var scope = app.Services.CreateScope())

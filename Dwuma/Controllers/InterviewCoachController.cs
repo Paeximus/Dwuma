@@ -1,8 +1,12 @@
-﻿using Dwuma.Models.Interview;
+﻿using Dwuma.Models.Data.DwumaContext;
+using Dwuma.Models.Interview;
 using Dwuma.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+
 
 namespace Dwuma.Controllers;
 
@@ -15,15 +19,18 @@ public sealed class InterviewCoachController : ControllerBase
     private readonly InterviewCoachService _interviewCoach;
     private readonly ILogger<InterviewCoachController> _logger;
     private readonly NotificationService _notificationService;
+    private readonly DwumaContext _context;
 
     public InterviewCoachController(
         InterviewCoachService interviewCoach,
         ILogger<InterviewCoachController> logger,
-        NotificationService notificationService)
+        NotificationService notificationService,
+        DwumaContext context)
     {
         _interviewCoach = interviewCoach;
         _logger = logger;
         _notificationService = notificationService;
+        _context = context;
     }
 
     [HttpPost("questions")]
@@ -171,6 +178,145 @@ public sealed class InterviewCoachController : ControllerBase
                 });
         }
 
+    }
+
+
+    [HttpPost("video-session")]
+    [RequestSizeLimit(200_000_000)]
+    public async Task<IActionResult> UploadVideoSession(
+    [FromForm] VideoInterviewSessionRequest request,
+    CancellationToken cancellationToken)
+    {
+        if (request.VideoFile == null ||
+            request.VideoFile.Length == 0)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Interview video is required."
+            });
+        }
+
+        if (request.SessionId <= 0)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "A valid interview session ID is required."
+            });
+        }
+
+        List<VideoQuestionTiming>? timings;
+
+        try
+        {
+            timings =
+                JsonSerializer.Deserialize<
+                    List<VideoQuestionTiming>>(
+                    request.QuestionTimingsJson,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive =
+                            true
+                    });
+        }
+        catch (JsonException)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Question timing data is invalid."
+            });
+        }
+
+        timings ??= [];
+
+        if (timings.Count == 0)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Question timing data is required."
+            });
+        }
+
+        string contentType =
+            request.VideoFile.ContentType
+                ?.ToLowerInvariant()
+            ?? string.Empty;
+
+        string extension =
+            Path.GetExtension(
+                request.VideoFile.FileName)
+            .ToLowerInvariant();
+
+        bool supportedVideo =
+            contentType.StartsWith(
+                "video/webm") ||
+            contentType.StartsWith(
+                "video/mp4") ||
+            extension == ".webm" ||
+            extension == ".mp4";
+
+        if (!supportedVideo)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Only WebM or MP4 interview recordings are supported."
+            });
+        }
+
+        // Verify that this session belongs
+        // to the authenticated user.
+        int userId = GetUserId();
+
+        var session =
+            await _context.InterviewSessions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    s =>
+                        s.Id ==
+                            request.SessionId &&
+                        s.UserId ==
+                            userId,
+                    cancellationToken);
+
+        if (session == null)
+        {
+            return NotFound(new
+            {
+                message =
+                    "Interview session was not found."
+            });
+        }
+
+        // PHASE 6:
+        // We are only confirming successful upload.
+        // Processing comes in Phase 7.
+
+        return Ok(new
+        {
+            message =
+                "Interview video uploaded successfully.",
+
+            sessionId =
+                request.SessionId,
+
+            fileName =
+                request.VideoFile.FileName,
+
+            contentType =
+                request.VideoFile.ContentType,
+
+            fileSize =
+                request.VideoFile.Length,
+
+            questionCount =
+                timings.Count,
+
+            timings
+        });
     }
 
     private int GetUserId()

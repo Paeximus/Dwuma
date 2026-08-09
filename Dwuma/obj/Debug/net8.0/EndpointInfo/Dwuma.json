@@ -520,6 +520,69 @@
         }
       }
     },
+    "/api/interview/video-session": {
+      "post": {
+        "tags": [
+          "InterviewCoach"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "SessionId": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "JobTitle": {
+                    "type": "string"
+                  },
+                  "CompanyName": {
+                    "type": "string"
+                  },
+                  "JobDescription": {
+                    "type": "string"
+                  },
+                  "VideoFile": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "QuestionTimingsJson": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "SessionId": {
+                  "style": "form"
+                },
+                "JobTitle": {
+                  "style": "form"
+                },
+                "CompanyName": {
+                  "style": "form"
+                },
+                "JobDescription": {
+                  "style": "form"
+                },
+                "VideoFile": {
+                  "style": "form"
+                },
+                "QuestionTimingsJson": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/job-interactions/{jobId}/click": {
       "post": {
         "tags": [
@@ -2353,7 +2416,6 @@
         "type": "object",
         "properties": {
           "login": {
-            "maxLength": 255,
             "minLength": 1,
             "type": "string"
           },
