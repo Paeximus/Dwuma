@@ -1,7 +1,7 @@
 [
   {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_16",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_17",
     "RelativePath": "",
     "HttpMethod": "GET",
     "IsController": false,
@@ -776,6 +776,42 @@
     ]
   },
   {
+    "ContainingType": "Dwuma.Controllers.ScraperController",
+    "Method": "ScrapeInterviewQuestions",
+    "RelativePath": "api/scraper/interview-questions",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "url",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "source",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "role",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[Dwuma.Scraping.Models.ScrapedInterviewQuestion, Dwuma, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
     "ContainingType": "Dwuma.Controllers.SkillsGapController",
     "Method": "Analyse",
     "RelativePath": "api/SkillsGap/analyse",
@@ -813,7 +849,7 @@
   },
   {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_15",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_16",
     "RelativePath": "health",
     "HttpMethod": "GET",
     "IsController": false,

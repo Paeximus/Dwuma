@@ -133,3 +133,4 @@ D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\Dwuma.xml
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\Dwuma.pdb
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\Dwuma.genruntimeconfig.cache
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\ref\Dwuma.dll
+D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\AngleSharp.dll

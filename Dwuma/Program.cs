@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
+using Dwuma.Scraping.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -155,6 +156,19 @@ builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<DashboardService>();
+
+builder.Services.AddHttpClient<
+    InterviewQuestionScraper>(
+    client =>
+    {
+        client.Timeout =
+            TimeSpan.FromSeconds(20);
+
+        client.DefaultRequestHeaders
+            .UserAgent
+            .ParseAdd(
+                "DwumaInterviewResearch/1.0");
+    });
 
 string[] allowedOrigins =
     builder.Configuration

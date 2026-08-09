@@ -1,8 +1,9 @@
-﻿using System.Text;
-using System.Text.Json;
-using Dwuma.Models.Interview;
+﻿using Dwuma.Models.Interview;
+using Dwuma.Scraping.Services;
 using Microsoft.AspNetCore.Http;
 using System.IO;
+using System.Text;
+using System.Text.Json;
 
 namespace Dwuma.Services;
 
@@ -11,20 +12,23 @@ public sealed class InterviewCoachService
     private readonly GeminiService _geminiService;
     private readonly ILogger<InterviewCoachService> _logger;
     private readonly NotificationService _notificationService;
+    private readonly InterviewQuestionScraper _scraper;
 
     public InterviewCoachService(
         GeminiService geminiService,
         ILogger<InterviewCoachService> logger,
-        NotificationService notificationService)
+        NotificationService notificationService,
+        InterviewQuestionScraper scraper)
     {
         _geminiService = geminiService;
         _logger = logger;
         _notificationService = notificationService;
+        _scraper = scraper;
     }
 
     public async Task<InterviewQuestionResponse> GenerateQuestionsAsync(
-        InterviewQuestionRequest request,
-        CancellationToken cancellationToken = default)
+    InterviewQuestionRequest request,
+    CancellationToken cancellationToken = default)
     {
         ValidateQuestionRequest(request);
 
@@ -53,6 +57,8 @@ public sealed class InterviewCoachService
                 1,
                 10);
 
+        // Gemini still generates the full interview.
+        // We will replace Q1, Q2 and Q3 afterwards.
         string prompt =
             BuildQuestionPrompt(request);
 
@@ -65,9 +71,101 @@ public sealed class InterviewCoachService
                 cancellationToken:
                     cancellationToken);
 
-        return ParseJson<InterviewQuestionResponse>(
-            rawJson,
-            "interview questions");
+        InterviewQuestionResponse response =
+            ParseJson<InterviewQuestionResponse>(
+                rawJson,
+                "interview questions");
+
+        response.Questions ??= [];
+
+        // ------------------------------------------------
+        // Q1 AND Q2 = GENERIC
+        // Q3 = SCRAPED
+        // Q4+ = KEEP GEMINI QUESTIONS
+        // ------------------------------------------------
+
+        List<string> fixedQuestions =
+            await BuildInterviewQuestionsAsync(
+                request.JobTitle,
+                request.NumberOfQuestions,
+                cancellationToken);
+
+        // Q1
+        if (
+            response.Questions.Count >= 1 &&
+            fixedQuestions.Count >= 1)
+        {
+            response.Questions[0].Question =
+                fixedQuestions[0];
+
+            response.Questions[0].Number = 1;
+
+            response.Questions[0].Category =
+                "general";
+
+            response.Questions[0].Difficulty =
+                "beginner";
+
+            response.Questions[0]
+                .WhatInterviewerLooksFor =
+                "A concise professional introduction covering relevant background, skills, experience, and career interests.";
+        }
+
+        // Q2
+        if (
+            response.Questions.Count >= 2 &&
+            fixedQuestions.Count >= 2)
+        {
+            response.Questions[1].Question =
+                fixedQuestions[1];
+
+            response.Questions[1].Number = 2;
+
+            response.Questions[1].Category =
+                "general";
+
+            response.Questions[1].Difficulty =
+                "beginner";
+
+            response.Questions[1]
+                .WhatInterviewerLooksFor =
+                "Clear motivation for the role and an understanding of how it connects with the candidate's skills and career goals.";
+        }
+
+        // Q3
+        if (
+    response.Questions.Count >= 3 &&
+    fixedQuestions.Count >= 3)
+        {
+            // Replace Gemini Q3 only when
+            // scraping actually returned a question.
+            response.Questions[2].Question =
+                fixedQuestions[2];
+
+            response.Questions[2].Number = 3;
+
+            response.Questions[2].Category =
+                "technical";
+
+            response.Questions[2].Difficulty =
+                "intermediate";
+
+            response.Questions[2]
+                .WhatInterviewerLooksFor =
+                "A clear, relevant and structured response demonstrating practical understanding of the role.";
+        }
+
+        // Make sure numbering remains correct
+        for (
+            int index = 0;
+            index < response.Questions.Count;
+            index++)
+        {
+            response.Questions[index].Number =
+                index + 1;
+        }
+
+        return response;
     }
 
     public async Task<InterviewFeedbackResponse> EvaluateAnswerAsync(
@@ -717,5 +815,119 @@ public sealed class InterviewCoachService
             Transcription = transcription,
             Feedback = feedback
         };
+    }
+
+    private static readonly string[] GenericInterviewQuestions =
+    {
+        "Tell me about yourself.",
+        "Why are you interested in this role?"
+    };
+
+    private async Task<List<string>> BuildInterviewQuestionsAsync(
+    string role,
+    int totalQuestions,
+    CancellationToken cancellationToken)
+    {
+        var finalQuestions = new List<string>();
+
+        // Q1 and Q2 are always generic
+        finalQuestions.AddRange(
+            GenericInterviewQuestions);
+
+        if (totalQuestions <= 2)
+        {
+            return finalQuestions
+                .Take(totalQuestions)
+                .ToList();
+        }
+
+        try
+        {
+            var scrapedQuestions =
+                await _scraper.ScrapeAsync(
+                    "https://www.indeed.com/career-advice/interviewing/behavioral-interview-questions",
+                    "Indeed",
+                    role,
+                    cancellationToken);
+            var allQuestions =
+                scrapedQuestions
+                    .Where(q =>
+                        !string.IsNullOrWhiteSpace(
+                            q.Question))
+                    .Select(q =>
+                        q.Question.Trim())
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+            var roleRelevantQuestions =
+                allQuestions
+                    .Where(q =>
+                        MatchesRole(
+                            q,
+                            role))
+                    .ToList();
+
+            var questionPool =
+                roleRelevantQuestions.Count > 0
+                    ? roleRelevantQuestions
+                    : allQuestions;
+
+            string? scrapedQuestion =
+                questionPool
+                    .OrderBy(_ =>
+                        Guid.NewGuid())
+                    .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(
+                scrapedQuestion))
+            {
+                finalQuestions.Add(
+                    scrapedQuestion);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Unable to retrieve scraped interview question for role {Role}. Gemini question will be used as fallback.",
+                role);
+        }
+
+        return finalQuestions
+            .Take(totalQuestions)
+            .ToList();
+    }
+
+    private static bool MatchesRole(
+    string question,
+    string? role)
+    {
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            return true;
+        }
+
+        string normalizedQuestion =
+            question.ToLowerInvariant();
+
+        string[] roleWords =
+            role
+                .ToLowerInvariant()
+                .Split(
+                    ' ',
+                    StringSplitOptions
+                        .RemoveEmptyEntries);
+
+        return roleWords.Any(
+            word =>
+                word.Length >= 3 &&
+                normalizedQuestion.Contains(
+                    word,
+                    StringComparison.OrdinalIgnoreCase));
     }
 }
