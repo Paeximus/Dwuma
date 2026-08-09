@@ -1070,6 +1070,43 @@ public sealed class InterviewCoachService
     }
 
 
+    public async Task<string>
+    TranscribeAnswerAudioAsync(
+        byte[] audioBytes,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        if (audioBytes == null ||
+            audioBytes.Length == 0)
+        {
+            throw new ArgumentException(
+                "Audio data is required.");
+        }
+
+        string normalizedContentType =
+            contentType.StartsWith(
+                "audio/webm",
+                StringComparison.OrdinalIgnoreCase)
+                ? "audio/webm"
+                : contentType;
+
+        string transcript =
+            await _geminiService
+                .TranscribeAudioAsync(
+                    audioBytes,
+                    normalizedContentType,
+                    cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(
+                transcript))
+        {
+            throw new InvalidOperationException(
+                "No speech was detected in the interview answer.");
+        }
+
+        return transcript.Trim();
+    }
+
     private static string ToGeminiTimestamp(
     double seconds)
     {

@@ -328,78 +328,28 @@ public sealed class InterviewCoachController : ControllerBase
 
 
 
-        try
+        return Ok(new
         {
-            VideoInterviewTranscriptionResponse transcription =
-                await _interviewCoach
-                    .TranscribeVideoInterviewAsync(
-                        request.VideoFile,
-                        timings,
-                        cancellationToken);
+            message =
+        "Interview video uploaded successfully.",
 
-            return Ok(new
-            {
-                message =
-                    "Interview video transcribed successfully.",
+            sessionId =
+        request.SessionId,
 
-                sessionId =
-                    request.SessionId,
+            fileName =
+        request.VideoFile.FileName,
 
-                fileName =
-                    request.VideoFile.FileName,
+            contentType =
+        request.VideoFile.ContentType,
 
-                contentType =
-                    request.VideoFile.ContentType,
+            fileSize =
+        request.VideoFile.Length,
 
-                fileSize =
-                    request.VideoFile.Length,
+            questionCount =
+        timings.Count
+        });
 
-                questionCount =
-                    timings.Count,
-
-                answers =
-                    transcription.Answers
-            });
         }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new
-            {
-                message =
-                    ex.Message
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogError(
-                ex,
-                "Interview video transcription failed for session {SessionId}.",
-                request.SessionId);
-
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    message =
-                        "The interview recording could not be transcribed."
-                });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Unexpected video interview failure for session {SessionId}.",
-                request.SessionId);
-
-            return StatusCode(
-                StatusCodes.Status500InternalServerError,
-                new
-                {
-                    message = ex.Message,
-                    exceptionType = ex.GetType().Name
-                });
-        }
-    }
 
     [HttpPost("sessions/{sessionId:int}/complete")]
     public async Task<IActionResult> CompleteInterview(
@@ -451,6 +401,96 @@ public sealed class InterviewCoachController : ControllerBase
             company =
                 session.Company
         });
+    }
+
+    [HttpPost("transcribe-answer")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> TranscribeAnswer(
+    [FromForm] IFormFile audioFile,
+    CancellationToken cancellationToken)
+    {
+        if (audioFile == null ||
+            audioFile.Length == 0)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "An audio recording is required."
+            });
+        }
+
+        const long maximumAudioSize =
+            15 * 1024 * 1024;
+
+        if (audioFile.Length >
+            maximumAudioSize)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "The audio recording is too large."
+            });
+        }
+
+        string contentType =
+            string.IsNullOrWhiteSpace(
+                audioFile.ContentType)
+                ? "audio/webm"
+                : audioFile.ContentType;
+
+        if (contentType.StartsWith(
+                "audio/webm",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            contentType =
+                "audio/webm";
+        }
+
+        await using var memoryStream =
+            new MemoryStream();
+
+        await audioFile.CopyToAsync(
+            memoryStream,
+            cancellationToken);
+
+        try
+        {
+            string transcript =
+                await _interviewCoach
+                    .TranscribeAnswerAudioAsync(
+                        memoryStream.ToArray(),
+                        contentType,
+                        cancellationToken);
+
+            return Ok(new
+            {
+                transcript =
+                    transcript.Trim()
+            });
+        }
+
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
+
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Interview answer transcription failed.");
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message =
+                        "The spoken answer could not be transcribed."
+                });
+        }
     }
 
     private int GetUserId()
