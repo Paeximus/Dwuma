@@ -930,4 +930,120 @@ public sealed class InterviewCoachService
                     word,
                     StringComparison.OrdinalIgnoreCase));
     }
+
+    public async Task<VideoInterviewTranscriptionResponse>
+    TranscribeVideoInterviewAsync(
+        IFormFile videoFile,
+        List<VideoQuestionTiming> timings,
+        CancellationToken cancellationToken = default)
+    {
+        if (videoFile is null ||
+            videoFile.Length == 0)
+        {
+            throw new ArgumentException(
+                "Interview video is required.");
+        }
+
+        if (timings is null ||
+            timings.Count == 0)
+        {
+            throw new ArgumentException(
+                "Question timing data is required.");
+        }
+
+        string contentType =
+            string.IsNullOrWhiteSpace(
+                videoFile.ContentType)
+                ? "video/webm"
+                : videoFile.ContentType;
+
+        if (
+            !contentType.StartsWith(
+                "video/webm",
+                StringComparison.OrdinalIgnoreCase) &&
+            !contentType.StartsWith(
+                "video/mp4",
+                StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            throw new ArgumentException(
+                $"Unsupported interview video format: {contentType}");
+        }
+
+        await using var memoryStream =
+            new MemoryStream();
+
+        await videoFile.CopyToAsync(
+            memoryStream,
+            cancellationToken);
+
+        string timingText =
+            string.Join(
+                Environment.NewLine,
+                timings.Select(t =>
+                    $"""
+                Question {t.QuestionNumber}
+                Question ID: {t.QuestionId}
+                Question: {t.Question}
+                Candidate answer starts at: {t.AnswerStartedAt:F2} seconds
+                Candidate answer ends at: {t.AnswerEndedAt:F2} seconds
+                """));
+
+        string prompt =
+             $$"""
+            You are transcribing a recorded job interview.
+
+            The supplied video contains the candidate's
+            webcam and microphone audio.
+
+            Only transcribe the candidate's spoken answers.
+
+            ANSWER WINDOWS
+
+            {{timingText}}
+
+            For every question:
+
+            - Transcribe only speech during its answer window.
+            - Do not invent missing words.
+            - Do not improve grammar.
+            - Do not summarize.
+            - Preserve what the candidate actually said.
+            - If no intelligible answer exists, return an empty transcript.
+
+            Return JSON only:
+
+            {
+              "answers": [
+                {
+                  "questionId": 1,
+                  "questionNumber": 1,
+                  "question": "Question text",
+                  "transcript": "Candidate answer",
+                  "answerStartedAt": 10.5,
+                  "answerEndedAt": 38.2
+                }
+              ]
+            }
+            """;
+
+        string rawJson =
+            await _geminiService
+                .AnalyzeVideoAsync(
+                    memoryStream.ToArray(),
+                    contentType,
+                    prompt,
+                    cancellationToken);
+
+        VideoInterviewTranscriptionResponse response =
+            ParseJson<
+                VideoInterviewTranscriptionResponse>(
+                    rawJson,
+                    "video interview transcription");
+
+        response.Answers ??= [];
+
+        return response;
+    }
+
 }

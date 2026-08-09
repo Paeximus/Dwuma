@@ -15,11 +15,8 @@ public sealed class VideoInterviewSessionRequest
     public string JobDescription { get; set; }
         = string.Empty;
 
-    public IFormFile VideoFile { get; set; }
-        = null!;
+    public IFormFile? VideoFile { get; set; }
 
-    // JSON representation of all
-    // question/answer timestamps.
     public string QuestionTimingsJson { get; set; }
-        = "[]";
+        = string.Empty;
 }

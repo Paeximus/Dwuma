@@ -1,3 +1,4 @@
+using Dwuma.Models.Interview;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -280,6 +281,82 @@ public sealed class GeminiService
         string responseBody =
             await response.Content.ReadAsStringAsync(
                 cancellationToken);
+
+        await EnsureSuccessfulResponseAsync(
+            response,
+            responseBody);
+
+        return ExtractGeneratedText(
+            responseBody);
+    }
+
+    private async Task<string> SendVideoRequestAsync(
+    string model,
+    byte[] videoBytes,
+    string contentType,
+    string prompt,
+    CancellationToken cancellationToken)
+    {
+        string base64Video =
+            Convert.ToBase64String(
+                videoBytes);
+
+        var requestBody = new
+        {
+            contents = new[]
+            {
+            new
+            {
+                role = "user",
+
+                parts = new object[]
+                {
+                    new
+                    {
+                        text = prompt
+                    },
+
+                    new
+                    {
+                        inlineData = new
+                        {
+                            mimeType =
+                                contentType,
+
+                            data =
+                                base64Video
+                        }
+                    }
+                }
+            }
+        },
+
+            generationConfig = new
+            {
+                temperature = 0.0,
+
+                maxOutputTokens =
+                    6000,
+
+                responseMimeType =
+                    "application/json"
+            }
+        };
+
+        using var request =
+            CreateRequest(
+                model,
+                requestBody);
+
+        using HttpResponseMessage response =
+            await _httpClient.SendAsync(
+                request,
+                cancellationToken);
+
+        string responseBody =
+            await response.Content
+                .ReadAsStringAsync(
+                    cancellationToken);
 
         await EnsureSuccessfulResponseAsync(
             response,
@@ -586,6 +663,93 @@ public sealed class GeminiService
 
         return Task.FromResult(safeMessage);
     }
+
+    public async Task<string> AnalyzeVideoAsync(
+    byte[] videoBytes,
+    string contentType,
+    string prompt,
+    CancellationToken cancellationToken = default)
+{
+    if (videoBytes is null ||
+        videoBytes.Length == 0)
+    {
+        throw new ArgumentException(
+            "Video data cannot be empty.",
+            nameof(videoBytes));
+    }
+
+    if (string.IsNullOrWhiteSpace(contentType))
+    {
+        contentType = "video/webm";
+    }
+
+    if (string.IsNullOrWhiteSpace(prompt))
+    {
+        throw new ArgumentException(
+            "Video analysis prompt cannot be empty.",
+            nameof(prompt));
+    }
+
+    Exception? lastException = null;
+
+    foreach (string model in _models)
+    {
+        for (
+            int attempt = 1;
+            attempt <= MaximumAttemptsPerModel;
+            attempt++)
+        {
+            try
+            {
+                return await SendVideoRequestAsync(
+                    model,
+                    videoBytes,
+                    contentType,
+                    prompt,
+                    cancellationToken);
+            }
+            catch (GeminiRateLimitException ex)
+            {
+                lastException = ex;
+
+                if (attempt ==
+                    MaximumAttemptsPerModel)
+                {
+                    break;
+                }
+
+                await Task.Delay(
+                    ex.RetryAfter ??
+                    CalculateRetryDelay(attempt),
+                    cancellationToken);
+            }
+            catch (GeminiTemporaryException ex)
+            {
+                lastException = ex;
+
+                if (attempt ==
+                    MaximumAttemptsPerModel)
+                {
+                    break;
+                }
+
+                await Task.Delay(
+                    CalculateRetryDelay(attempt),
+                    cancellationToken);
+            }
+            catch (GeminiRequestException ex)
+            {
+                lastException = ex;
+                break;
+            }
+        }
+    }
+
+    throw new InvalidOperationException(
+        "Video analysis is currently unavailable because all configured Gemini models failed.",
+        lastException);
+}
+
 }
 
 public sealed class GeminiRateLimitException
@@ -628,3 +792,7 @@ public sealed class GeminiRequestException
     {
     }
 }
+
+
+
+    

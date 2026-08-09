@@ -38,15 +38,50 @@ public sealed class InterviewCoachController : ControllerBase
         typeof(InterviewQuestionResponse),
         StatusCodes.Status200OK)]
     public async Task<IActionResult> GenerateQuestions(
-        [FromBody] InterviewQuestionRequest request,
-        CancellationToken cancellationToken)
+    [FromBody] InterviewQuestionRequest request,
+    CancellationToken cancellationToken)
     {
         try
         {
             InterviewQuestionResponse response =
-                await _interviewCoach.GenerateQuestionsAsync(
-                    request,
-                    cancellationToken);
+                await _interviewCoach
+                    .GenerateQuestionsAsync(
+                        request,
+                        cancellationToken);
+
+            int userId =
+                GetUserId();
+
+            var session =
+                new InterviewSession
+                {
+                    UserId =
+                        userId,
+
+                    JobListingId =
+                        null,
+
+                    Company =
+                        request.CompanyName,
+
+                    Role =
+                        request.JobTitle,
+
+                    StartedAt =
+                        DateTime.UtcNow,
+
+                    CompletedAt =
+                        null
+                };
+
+            _context.InterviewSessions.Add(
+                session);
+
+            await _context.SaveChangesAsync(
+                cancellationToken);
+
+            response.SessionId =
+                session.Id;
 
             return Ok(response);
         }
@@ -291,32 +326,64 @@ public sealed class InterviewCoachController : ControllerBase
             });
         }
 
-        // PHASE 6:
-        // We are only confirming successful upload.
-        // Processing comes in Phase 7.
 
-        return Ok(new
+
+        try
         {
-            message =
-                "Interview video uploaded successfully.",
+            VideoInterviewTranscriptionResponse transcription =
+                await _interviewCoach
+                    .TranscribeVideoInterviewAsync(
+                        request.VideoFile,
+                        timings,
+                        cancellationToken);
 
-            sessionId =
-                request.SessionId,
+            return Ok(new
+            {
+                message =
+                    "Interview video transcribed successfully.",
 
-            fileName =
-                request.VideoFile.FileName,
+                sessionId =
+                    request.SessionId,
 
-            contentType =
-                request.VideoFile.ContentType,
+                fileName =
+                    request.VideoFile.FileName,
 
-            fileSize =
-                request.VideoFile.Length,
+                contentType =
+                    request.VideoFile.ContentType,
 
-            questionCount =
-                timings.Count,
+                fileSize =
+                    request.VideoFile.Length,
 
-            timings
-        });
+                questionCount =
+                    timings.Count,
+
+                answers =
+                    transcription.Answers
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message =
+                    ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Interview video transcription failed for session {SessionId}.",
+                request.SessionId);
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message =
+                        "The interview recording could not be transcribed."
+                });
+        }
     }
 
     private int GetUserId()

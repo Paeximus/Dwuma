@@ -2014,6 +2014,10 @@
       "InterviewQuestionResponse": {
         "type": "object",
         "properties": {
+          "sessionId": {
+            "type": "integer",
+            "format": "int32"
+          },
           "jobTitle": {
             "type": "string",
             "nullable": true

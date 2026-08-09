@@ -2,6 +2,8 @@
 
 public sealed class InterviewQuestionResponse
 {
+    public int SessionId { get; set; }
+
     public string JobTitle { get; set; } = string.Empty;
 
     public string CompanyName { get; set; } = string.Empty;
