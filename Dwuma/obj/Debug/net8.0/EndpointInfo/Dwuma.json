@@ -606,6 +606,38 @@
         }
       }
     },
+    "/api/interview/transcribe-answer": {
+      "post": {
+        "tags": [
+          "InterviewCoach"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AudioFile": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "AudioFile": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/job-interactions/{jobId}/click": {
       "post": {
         "tags": [

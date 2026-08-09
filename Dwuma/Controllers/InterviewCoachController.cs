@@ -406,11 +406,11 @@ public sealed class InterviewCoachController : ControllerBase
     [HttpPost("transcribe-answer")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> TranscribeAnswer(
-    [FromForm] IFormFile audioFile,
+    [FromForm] TranscribeAnswerRequest request,
     CancellationToken cancellationToken)
     {
-        if (audioFile == null ||
-            audioFile.Length == 0)
+        if (request.AudioFile == null ||
+            request.AudioFile.Length == 0)
         {
             return BadRequest(new
             {
@@ -422,7 +422,7 @@ public sealed class InterviewCoachController : ControllerBase
         const long maximumAudioSize =
             15 * 1024 * 1024;
 
-        if (audioFile.Length >
+        if (request.AudioFile.Length >
             maximumAudioSize)
         {
             return BadRequest(new
@@ -434,9 +434,9 @@ public sealed class InterviewCoachController : ControllerBase
 
         string contentType =
             string.IsNullOrWhiteSpace(
-                audioFile.ContentType)
+                request.AudioFile.ContentType)
                 ? "audio/webm"
-                : audioFile.ContentType;
+                : request.AudioFile.ContentType;
 
         if (contentType.StartsWith(
                 "audio/webm",
@@ -449,7 +449,7 @@ public sealed class InterviewCoachController : ControllerBase
         await using var memoryStream =
             new MemoryStream();
 
-        await audioFile.CopyToAsync(
+        await request.AudioFile.CopyToAsync(
             memoryStream,
             cancellationToken);
 
@@ -468,7 +468,6 @@ public sealed class InterviewCoachController : ControllerBase
                     transcript.Trim()
             });
         }
-
         catch (ArgumentException ex)
         {
             return BadRequest(new
@@ -476,7 +475,6 @@ public sealed class InterviewCoachController : ControllerBase
                 message = ex.Message
             });
         }
-
         catch (InvalidOperationException ex)
         {
             _logger.LogError(
