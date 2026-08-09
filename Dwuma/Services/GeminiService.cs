@@ -313,11 +313,6 @@ public sealed class GeminiService
                 {
                     new
                     {
-                        text = prompt
-                    },
-
-                    new
-                    {
                         inlineData = new
                         {
                             mimeType =
@@ -326,6 +321,12 @@ public sealed class GeminiService
                             data =
                                 base64Video
                         }
+                    },
+
+                    new
+                    {
+                        text =
+                            prompt
                     }
                 }
             }
@@ -730,6 +731,71 @@ public sealed class GeminiService
         return Task.FromResult(safeMessage);
     }
 
+    public async Task<string> TestVideoAudioAsync(
+    byte[] videoBytes,
+    string contentType,
+    CancellationToken cancellationToken = default)
+    {
+        if (videoBytes is null ||
+            videoBytes.Length == 0)
+        {
+            throw new ArgumentException(
+                "Video data cannot be empty.",
+                nameof(videoBytes));
+        }
+
+        string normalizedContentType =
+            contentType.StartsWith(
+                "video/webm",
+                StringComparison.OrdinalIgnoreCase)
+                ? "video/webm"
+                : contentType.StartsWith(
+                    "video/mp4",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "video/mp4"
+                    : contentType;
+
+        Exception? lastException = null;
+
+        foreach (string model in _models)
+        {
+            try
+            {
+                return await SendRawVideoRequestAsync(
+                    model,
+                    videoBytes,
+                    normalizedContentType,
+                    """
+                Listen carefully to the audio track of this video.
+
+                Transcribe every intelligible spoken word
+                that you can hear in chronological order.
+
+                Do not summarize.
+                Do not evaluate the speaker.
+                Do not return JSON.
+                Return plain text only.
+                """,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+
+                _logger.LogWarning(
+                    ex,
+                    "Raw video audio test failed using model {Model}.",
+                    model);
+            }
+        }
+
+        throw new InvalidOperationException(
+            "The raw video audio test failed.",
+            lastException);
+    }
+
+
+
     public async Task<string> AnalyzeVideoAsync(
     byte[] videoBytes,
     string contentType,
@@ -815,6 +881,78 @@ public sealed class GeminiService
         "Video analysis is currently unavailable because all configured Gemini models failed.",
         lastException);
 }
+
+    private async Task<string> SendRawVideoRequestAsync(
+    string model,
+    byte[] videoBytes,
+    string contentType,
+    string prompt,
+    CancellationToken cancellationToken)
+    {
+        string base64Video =
+            Convert.ToBase64String(
+                videoBytes);
+
+        var requestBody = new
+        {
+            contents = new[]
+            {
+            new
+            {
+                role = "user",
+
+                parts = new object[]
+                {
+                    new
+                    {
+                        inlineData = new
+                        {
+                            mimeType =
+                                contentType,
+
+                            data =
+                                base64Video
+                        }
+                    },
+
+                    new
+                    {
+                        text =
+                            prompt
+                    }
+                }
+            }
+        },
+
+            generationConfig = new
+            {
+                temperature = 0.0,
+                maxOutputTokens = 4000
+            }
+        };
+
+        using var request =
+            CreateRequest(
+                model,
+                requestBody);
+
+        using HttpResponseMessage response =
+            await _httpClient.SendAsync(
+                request,
+                cancellationToken);
+
+        string responseBody =
+            await response.Content
+                .ReadAsStringAsync(
+                    cancellationToken);
+
+        await EnsureSuccessfulResponseAsync(
+            response,
+            responseBody);
+
+        return ExtractGeneratedText(
+            responseBody);
+    }
 
 }
 

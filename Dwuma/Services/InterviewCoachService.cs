@@ -952,24 +952,30 @@ public sealed class InterviewCoachService
         }
 
         string contentType =
-            string.IsNullOrWhiteSpace(
-                videoFile.ContentType)
-                ? "video/webm"
-                : videoFile.ContentType;
+    string.IsNullOrWhiteSpace(
+        videoFile.ContentType)
+        ? "video/webm"
+        : videoFile.ContentType;
 
-        if (
-            !contentType.StartsWith(
+        if (contentType.StartsWith(
                 "video/webm",
-                StringComparison.OrdinalIgnoreCase) &&
-            !contentType.StartsWith(
-                "video/mp4",
-                StringComparison.OrdinalIgnoreCase)
-        )
+                StringComparison.OrdinalIgnoreCase))
+        {
+            contentType =
+                "video/webm";
+        }
+        else if (contentType.StartsWith(
+                     "video/mp4",
+                     StringComparison.OrdinalIgnoreCase))
+        {
+            contentType =
+                "video/mp4";
+        }
+        else
         {
             throw new ArgumentException(
                 $"Unsupported interview video format: {contentType}");
         }
-
         await using var memoryStream =
             new MemoryStream();
 
@@ -981,47 +987,52 @@ public sealed class InterviewCoachService
             string.Join(
                 Environment.NewLine,
                 timings.Select(t =>
-                    $"""
-                Question {t.QuestionNumber}
-                Question ID: {t.QuestionId}
-                Question: {t.Question}
-                Candidate answer starts at: {t.AnswerStartedAt:F2} seconds
-                Candidate answer ends at: {t.AnswerEndedAt:F2} seconds
-                """));
+                {
+                    string start =
+                        ToGeminiTimestamp(
+                            t.AnswerStartedAt);
+
+                    string end =
+                        ToGeminiTimestamp(
+                            t.AnswerEndedAt);
+
+                    return
+                        $"""
+                        Question {t.QuestionNumber}
+                        Question: {t.Question}
+                        Candidate answer time: {start} to {end}
+                        """;
+                }));
 
         string prompt =
             $$"""
-            You are transcribing a recorded job interview.
+            Generate an accurate transcript of the candidate's
+            spoken answers in this job interview video.
 
-            The supplied WebM/MP4 video contains the candidate's
-            webcam recording and microphone audio.
+            The video contains both visual content and an audio track.
 
-            Your task is transcription, not evaluation.
+            There are exactly {{timings.Count}} interview questions.
 
-            There are exactly {{timings.Count}} candidate answers.
-
-            ANSWER WINDOWS
+            The candidate's answer windows are:
 
             {{timingText}}
 
-            For each supplied question:
+            Instructions:
 
-            - Listen carefully to the audio track.
-            - Transcribe what the candidate says.
-            - Use the supplied answer start/end times as guidance
-              for locating the candidate's answer.
+            - Listen to the AUDIO TRACK of the video.
+            - Transcribe the candidate's speech.
+            - Use the timestamps above to identify each answer.
+            - Ignore the interviewer's spoken questions.
+            - Preserve the candidate's actual words.
+            - Do not summarize.
+            - Do not improve grammar.
             - Do not invent words.
-            - Do not rewrite or improve grammar.
-            - Do not summarize the answer.
-            - Preserve the candidate's actual wording as closely
-              as possible.
-            - Ignore the interviewer's spoken question.
-            - Return one result for EVERY supplied question.
-            - If speech is genuinely unintelligible, use an empty
-              transcript only for that specific question.
+            - Return one answer object for every question.
+            - Only return an empty transcript if there is genuinely
+              no audible candidate speech during that answer window.
 
-            The output must contain exactly {{timings.Count}}
-            objects in the answers array.
+            There must be exactly {{timings.Count}} objects
+            in the answers array.
             """;
 
         string rawJson =
@@ -1058,4 +1069,24 @@ public sealed class InterviewCoachService
         return response;
     }
 
+
+    private static string ToGeminiTimestamp(
+    double seconds)
+    {
+        if (seconds < 0)
+        {
+            seconds = 0;
+        }
+
+        int totalSeconds =
+            (int)Math.Floor(seconds);
+
+        int minutes =
+            totalSeconds / 60;
+
+        int remainingSeconds =
+            totalSeconds % 60;
+
+        return $"{minutes:00}:{remainingSeconds:00}";
+    }
 }
