@@ -386,6 +386,58 @@ public sealed class InterviewCoachController : ControllerBase
         }
     }
 
+    [HttpPost("sessions/{sessionId:int}/complete")]
+    public async Task<IActionResult> CompleteInterview(
+    int sessionId,
+    CancellationToken cancellationToken)
+    {
+        int userId = GetUserId();
+
+        var session =
+            await _context.InterviewSessions
+                .FirstOrDefaultAsync(
+                    s =>
+                        s.Id == sessionId &&
+                        s.UserId == userId,
+                    cancellationToken);
+
+        if (session == null)
+        {
+            return NotFound(new
+            {
+                message =
+                    "Interview session was not found."
+            });
+        }
+
+        if (session.CompletedAt == null)
+        {
+            session.CompletedAt =
+                DateTime.UtcNow;
+
+            await _context.SaveChangesAsync(
+                cancellationToken);
+        }
+
+        return Ok(new
+        {
+            sessionId =
+                session.Id,
+
+            completed =
+                true,
+
+            completedAt =
+                session.CompletedAt,
+
+            role =
+                session.Role,
+
+            company =
+                session.Company
+        });
+    }
+
     private int GetUserId()
     {
         string? userIdValue =

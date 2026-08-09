@@ -288,6 +288,22 @@
   },
   {
     "ContainingType": "Dwuma.Controllers.InterviewCoachController",
+    "Method": "CompleteInterview",
+    "RelativePath": "api/interview/sessions/{sessionId}/complete",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Dwuma.Controllers.InterviewCoachController",
     "Method": "UploadVideoSession",
     "RelativePath": "api/interview/video-session",
     "HttpMethod": "POST",
