@@ -990,41 +990,38 @@ public sealed class InterviewCoachService
                 """));
 
         string prompt =
-             $$"""
+            $$"""
             You are transcribing a recorded job interview.
 
-            The supplied video contains the candidate's
-            webcam and microphone audio.
+            The supplied WebM/MP4 video contains the candidate's
+            webcam recording and microphone audio.
 
-            Only transcribe the candidate's spoken answers.
+            Your task is transcription, not evaluation.
+
+            There are exactly {{timings.Count}} candidate answers.
 
             ANSWER WINDOWS
 
             {{timingText}}
 
-            For every question:
+            For each supplied question:
 
-            - Transcribe only speech during its answer window.
-            - Do not invent missing words.
-            - Do not improve grammar.
-            - Do not summarize.
-            - Preserve what the candidate actually said.
-            - If no intelligible answer exists, return an empty transcript.
+            - Listen carefully to the audio track.
+            - Transcribe what the candidate says.
+            - Use the supplied answer start/end times as guidance
+              for locating the candidate's answer.
+            - Do not invent words.
+            - Do not rewrite or improve grammar.
+            - Do not summarize the answer.
+            - Preserve the candidate's actual wording as closely
+              as possible.
+            - Ignore the interviewer's spoken question.
+            - Return one result for EVERY supplied question.
+            - If speech is genuinely unintelligible, use an empty
+              transcript only for that specific question.
 
-            Return JSON only:
-
-            {
-              "answers": [
-                {
-                  "questionId": 1,
-                  "questionNumber": 1,
-                  "question": "Question text",
-                  "transcript": "Candidate answer",
-                  "answerStartedAt": 10.5,
-                  "answerEndedAt": 38.2
-                }
-              ]
-            }
+            The output must contain exactly {{timings.Count}}
+            objects in the answers array.
             """;
 
         string rawJson =
@@ -1034,14 +1031,29 @@ public sealed class InterviewCoachService
                     contentType,
                     prompt,
                     cancellationToken);
+        _logger.LogInformation(
+            "Gemini raw video transcription response: {RawJson}",
+            rawJson);
 
         VideoInterviewTranscriptionResponse response =
-            ParseJson<
-                VideoInterviewTranscriptionResponse>(
-                    rawJson,
-                    "video interview transcription");
+            ParseJson<VideoInterviewTranscriptionResponse>(
+                rawJson,
+                "video interview transcription");
 
-        response.Answers ??= [];
+        if (response.Answers == null ||
+            response.Answers.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Gemini returned no interview transcripts.");
+        }
+
+        foreach (var answer in response.Answers)
+        {
+            _logger.LogInformation(
+                "Transcript Q{QuestionNumber}: {Transcript}",
+                answer.QuestionNumber,
+                answer.Transcript);
+        }
 
         return response;
     }

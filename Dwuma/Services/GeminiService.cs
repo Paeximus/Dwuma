@@ -330,16 +330,82 @@ public sealed class GeminiService
                 }
             }
         },
-
             generationConfig = new
             {
                 temperature = 0.0,
 
-                maxOutputTokens =
-                    6000,
+                maxOutputTokens = 6000,
 
                 responseMimeType =
-                    "application/json"
+        "application/json",
+
+                responseJsonSchema = new
+                {
+                    type = "object",
+
+                    properties = new
+                    {
+                        answers = new
+                        {
+                            type = "array",
+
+                            minItems = 1,
+
+                            items = new
+                            {
+                                type = "object",
+
+                                properties = new
+                                {
+                                    questionId = new
+                                    {
+                                        type = "integer"
+                                    },
+
+                                    questionNumber = new
+                                    {
+                                        type = "integer"
+                                    },
+
+                                    question = new
+                                    {
+                                        type = "string"
+                                    },
+
+                                    transcript = new
+                                    {
+                                        type = "string"
+                                    },
+
+                                    answerStartedAt = new
+                                    {
+                                        type = "number"
+                                    },
+
+                                    answerEndedAt = new
+                                    {
+                                        type = "number"
+                                    }
+                                },
+
+                                required = new[]
+                    {
+                        "questionId",
+                        "questionNumber",
+                        "question",
+                        "transcript",
+                        "answerStartedAt",
+                        "answerEndedAt"
+                    }
+                            }
+                        }
+                    },
+
+                    required = new[]
+        {
+            "answers"
+        }
+                }
             }
         };
 
