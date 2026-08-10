@@ -41,4 +41,11 @@
 		<Folder Include="Shared\js\" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<Content Include="Piper\voices\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Content>
+	</ItemGroup>
+
 </Project>
