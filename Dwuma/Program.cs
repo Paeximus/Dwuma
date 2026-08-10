@@ -273,7 +273,7 @@ builder.Services.AddRateLimiter(options =>
         "ai-policy",
         limiterOptions =>
         {
-            limiterOptions.PermitLimit = 10;
+            limiterOptions.PermitLimit = 30;
             limiterOptions.Window =
                 TimeSpan.FromMinutes(1);
 

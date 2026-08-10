@@ -1,9 +1,10 @@
-﻿using Dwuma.Models.Interview;
-using Dwuma.Scraping.Services;
-using Microsoft.AspNetCore.Http;
-using System.IO;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
+using Dwuma.Models.Interview;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Dwuma.Models.Data.DwumaContext;
+using System.IO;
 
 namespace Dwuma.Services;
 
@@ -11,158 +12,74 @@ public sealed class InterviewCoachService
 {
     private readonly GeminiService _geminiService;
     private readonly ILogger<InterviewCoachService> _logger;
-    private readonly NotificationService _notificationService;
-    private readonly InterviewQuestionScraper _scraper;
+    private readonly DwumaContext _context;
 
     public InterviewCoachService(
         GeminiService geminiService,
-        ILogger<InterviewCoachService> logger,
-        NotificationService notificationService,
-        InterviewQuestionScraper scraper)
+        DwumaContext context,
+        ILogger<InterviewCoachService> logger)
     {
         _geminiService = geminiService;
+        _context = context;
         _logger = logger;
-        _notificationService = notificationService;
-        _scraper = scraper;
     }
 
     public async Task<InterviewQuestionResponse> GenerateQuestionsAsync(
-    InterviewQuestionRequest request,
-    CancellationToken cancellationToken = default)
+        InterviewQuestionRequest request,
+        int userId,
+        CancellationToken cancellationToken = default)
     {
         ValidateQuestionRequest(request);
 
-        if (!IsAllowedInterviewRole(
-                request.JobTitle,
-                request.JobDescription))
-        {
-            return new InterviewQuestionResponse
-            {
-                JobTitle =
-                    request.JobTitle,
+        request.NumberOfQuestions = Math.Clamp(
+            request.NumberOfQuestions,
+            1,
+            10);
 
-                CompanyName =
-                    request.CompanyName ?? string.Empty,
-
-                Notice =
-                    "Interview preparation is not available for illegal or harmful job roles.",
-
-                Questions = []
-            };
-        }
-
-        request.NumberOfQuestions =
-            Math.Clamp(
-                request.NumberOfQuestions,
-                1,
-                10);
-
-        // Gemini still generates the full interview.
-        // We will replace Q1, Q2 and Q3 afterwards.
-        string prompt =
-            BuildQuestionPrompt(request);
+        string prompt = BuildQuestionPrompt(request);
 
         string rawJson =
             await _geminiService.GenerateJsonAsync(
                 prompt,
-                responseSchema:
-                    CreateQuestionSchema(),
+                responseSchema: CreateQuestionSchema(),
                 maxOutputTokens: 4000,
-                cancellationToken:
-                    cancellationToken);
+                cancellationToken: cancellationToken);
 
-        InterviewQuestionResponse response =
-            ParseJson<InterviewQuestionResponse>(
-                rawJson,
-                "interview questions");
+        InterviewQuestionResponse response = ParseJson<InterviewQuestionResponse>(
+            rawJson,
+            "interview questions");
 
-        response.Questions ??= [];
-
-        // ------------------------------------------------
-        // Q1 AND Q2 = GENERIC
-        // Q3 = SCRAPED
-        // Q4+ = KEEP GEMINI QUESTIONS
-        // ------------------------------------------------
-
-        List<string> fixedQuestions =
-            await BuildInterviewQuestionsAsync(
-                request.JobTitle,
-                request.NumberOfQuestions,
-                cancellationToken);
-
-        // Q1
-        if (
-            response.Questions.Count >= 1 &&
-            fixedQuestions.Count >= 1)
+        if (response.Questions.Count != request.NumberOfQuestions ||
+            response.Questions.Any(question => string.IsNullOrWhiteSpace(question.Question)))
         {
-            response.Questions[0].Question =
-                fixedQuestions[0];
-
-            response.Questions[0].Number = 1;
-
-            response.Questions[0].Category =
-                "general";
-
-            response.Questions[0].Difficulty =
-                "beginner";
-
-            response.Questions[0]
-                .WhatInterviewerLooksFor =
-                "A concise professional introduction covering relevant background, skills, experience, and career interests.";
+            throw new InvalidOperationException("The AI did not return the complete question set.");
         }
 
-        // Q2
-        if (
-            response.Questions.Count >= 2 &&
-            fixedQuestions.Count >= 2)
+        var session = new InterviewSession
         {
-            response.Questions[1].Question =
-                fixedQuestions[1];
+            UserId = userId,
+            Role = request.JobTitle.Trim(),
+            Company = request.CompanyName?.Trim(),
+            StartedAt = DateTime.UtcNow
+        };
 
-            response.Questions[1].Number = 2;
-
-            response.Questions[1].Category =
-                "general";
-
-            response.Questions[1].Difficulty =
-                "beginner";
-
-            response.Questions[1]
-                .WhatInterviewerLooksFor =
-                "Clear motivation for the role and an understanding of how it connects with the candidate's skills and career goals.";
+        foreach (var item in response.Questions.OrderBy(question => question.Number))
+        {
+            session.InterviewQas.Add(new InterviewQa
+            {
+                Question = item.Question.Trim(),
+                QuestionOrder = item.Number,
+                ResponseMode = "text"
+            });
         }
 
-        // Q3
-        if (
-    response.Questions.Count >= 3 &&
-    fixedQuestions.Count >= 3)
+        _context.InterviewSessions.Add(session);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        response.SessionId = session.Id;
+        foreach (var item in response.Questions)
         {
-            // Replace Gemini Q3 only when
-            // scraping actually returned a question.
-            response.Questions[2].Question =
-                fixedQuestions[2];
-
-            response.Questions[2].Number = 3;
-
-            response.Questions[2].Category =
-                "technical";
-
-            response.Questions[2].Difficulty =
-                "intermediate";
-
-            response.Questions[2]
-                .WhatInterviewerLooksFor =
-                "A clear, relevant and structured response demonstrating practical understanding of the role.";
-        }
-
-        // Make sure numbering remains correct
-        for (
-            int index = 0;
-            index < response.Questions.Count;
-            index++)
-        {
-            response.Questions[index].Number =
-                index + 1;
+            item.Id = session.InterviewQas.Single(qa => qa.QuestionOrder == item.Number).Id;
         }
 
         return response;
@@ -170,9 +87,24 @@ public sealed class InterviewCoachService
 
     public async Task<InterviewFeedbackResponse> EvaluateAnswerAsync(
         InterviewAnswerRequest request,
+        int userId,
         CancellationToken cancellationToken = default)
     {
         ValidateAnswerRequest(request);
+
+        InterviewQa question = await _context.InterviewQas
+            .Include(qa => qa.Session)
+            .SingleOrDefaultAsync(qa => qa.Id == request.QuestionId &&
+                qa.SessionId == request.SessionId && qa.Session.UserId == userId,
+                cancellationToken)
+            ?? throw new ArgumentException("The interview question was not found.");
+
+        if (question.Session.CompletedAt is not null)
+            throw new ArgumentException("This interview is already complete.");
+        if (question.Score is not null)
+            throw new ArgumentException("This question has already been evaluated.");
+        if (!string.Equals(question.Question.Trim(), request.Question.Trim(), StringComparison.Ordinal))
+            throw new ArgumentException("The question does not belong to this interview.");
 
         string prompt = BuildFeedbackPrompt(request);
 
@@ -196,16 +128,69 @@ public sealed class InterviewCoachService
         response.Strengths ??= [];
         response.Improvements ??= [];
 
+        question.UserResponse = request.CandidateAnswer.Trim();
+        question.Score = response.Score;
+        question.Feedback = JsonSerializer.Serialize(response);
+        await _context.SaveChangesAsync(cancellationToken);
+
         return response;
     }
 
+    public async Task<InterviewCompletionResponse> CompleteInterviewAsync(
+        int sessionId, int userId, CancellationToken cancellationToken = default)
+    {
+        InterviewSession session = await _context.InterviewSessions
+            .Include(item => item.InterviewQas)
+            .SingleOrDefaultAsync(item => item.Id == sessionId && item.UserId == userId, cancellationToken)
+            ?? throw new ArgumentException("The interview session was not found.");
+
+        int total = session.InterviewQas.Count;
+        int answered = session.InterviewQas.Count(item => item.Score is not null);
+        if (total == 0 || answered != total)
+            throw new ArgumentException("Every interview question must be evaluated before completion.");
+
+        session.CompletedAt ??= DateTime.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+        return new InterviewCompletionResponse
+        {
+            SessionId = session.Id, Completed = true,
+            Score = (int)Math.Round(session.InterviewQas.Average(item => item.Score!.Value)),
+            QuestionsAnswered = answered, TotalQuestions = total,
+            CompletedAt = session.CompletedAt.Value
+        };
+    }
+
+    public async Task<LatestInterviewResponse?> GetLatestInterviewAsync(
+        int userId, CancellationToken cancellationToken = default)
+    {
+        InterviewSession? newest = await _context.InterviewSessions
+            .Include(item => item.InterviewQas)
+            .Where(item => item.UserId == userId)
+            .OrderByDescending(item => item.StartedAt).ThenByDescending(item => item.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // A newly started interview deliberately clears the previous dashboard result.
+        if (newest?.CompletedAt is null || newest.InterviewQas.Count == 0 ||
+            newest.InterviewQas.Any(item => item.Score is null)) return null;
+
+        int score = (int)Math.Round(newest.InterviewQas.Average(item => item.Score!.Value));
+        return new LatestInterviewResponse
+        {
+            SessionId = newest.Id, Completed = true, Score = score,
+            Role = newest.Role ?? string.Empty, Company = newest.Company ?? string.Empty,
+            Message = $"Latest {newest.Role} interview: {score}%",
+            Feedback = $"Completed all {newest.InterviewQas.Count} questions.",
+            QuestionsAnswered = newest.InterviewQas.Count,
+            CompletedAt = newest.CompletedAt.Value
+        };
+    }
+
     private static void ValidateQuestionRequest(
-    InterviewQuestionRequest request)
+        InterviewQuestionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (string.IsNullOrWhiteSpace(
-                request.JobTitle))
+        if (string.IsNullOrWhiteSpace(request.JobTitle))
         {
             throw new ArgumentException(
                 "The job title is required.");
@@ -216,6 +201,9 @@ public sealed class InterviewCoachService
         InterviewAnswerRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+
+        if (request.SessionId <= 0 || request.QuestionId <= 0)
+            throw new ArgumentException("A valid interview session and question are required.");
 
         if (string.IsNullOrWhiteSpace(request.Question))
         {
@@ -229,73 +217,6 @@ public sealed class InterviewCoachService
             throw new ArgumentException(
                 "The candidate answer is required.");
         }
-        ValidateInterviewSafety(request.JobTitle, request.JobDescription);
-    }
-
-    private static void ValidateInterviewSafety(
-    string? jobTitle,
-    string? jobDescription = null)
-    {
-        string combined =
-            $"{jobTitle} {jobDescription}"
-                .Trim()
-                .ToLowerInvariant();
-
-        string[] prohibitedTerms =
-        [
-            // Illegal drug production / trafficking
-            "meth production",
-        "meth producer",
-        "meth manufacturer",
-        "meth lab",
-        "cook meth",
-        "cocaine production",
-        "cocaine manufacturer",
-        "drug trafficking",
-        "drug trafficker",
-        "illegal drug manufacturing",
-
-        // Violence / murder-for-hire
-        "hitman",
-        "contract killer",
-        "assassin for hire",
-        "murder for hire",
-
-        // Human trafficking
-        "human trafficker",
-        "human trafficking",
-        "sex trafficking",
-
-        // Illegal weapons / explosives
-        "bomb maker",
-        "bomb making",
-        "illegal arms dealer",
-        "illegal weapons dealer",
-
-        // Fraud / theft
-        "credit card fraud",
-        "identity theft",
-        "fraud operator",
-        "scam operator",
-
-        // Malicious cybercrime
-        "ransomware operator",
-        "malware for theft",
-        "phishing scammer",
-        "credential thief"
-        ];
-
-        bool prohibited =
-            prohibitedTerms.Any(term =>
-                combined.Contains(
-                    term,
-                    StringComparison.OrdinalIgnoreCase));
-
-        if (prohibited)
-        {
-            throw new ArgumentException(
-                "Interview preparation is not available for illegal or harmful job roles.");
-        }
     }
 
     private static string BuildQuestionPrompt(
@@ -305,18 +226,6 @@ public sealed class InterviewCoachService
 
         prompt.AppendLine(
             "You are a professional interview coach.");
-
-        prompt.AppendLine(
-    "Only provide interview preparation for legitimate and lawful employment.");
-
-        prompt.AppendLine(
-            "Do not generate interview questions, explanations, instructions, procedures, or advice that would facilitate criminal activity, illegal drug production, trafficking, violence, fraud, theft, malicious hacking, illegal weapons activity, or exploitation.");
-
-        prompt.AppendLine(
-            "If a role is disguised but clearly involves illegal or harmful activity, do not provide operational guidance.");
-
-        prompt.AppendLine(
-            "Legitimate sensitive professions such as cybersecurity, chemistry, medicine, law enforcement, forensics, and regulated engineering are allowed, but questions must remain lawful, defensive, safety-focused, and professional.");
 
         prompt.AppendLine(
             "Generate realistic interview questions for the candidate.");
@@ -367,27 +276,12 @@ public sealed class InterviewCoachService
     }
 
     private static string BuildFeedbackPrompt(
-    InterviewAnswerRequest request)
+        InterviewAnswerRequest request)
     {
         var prompt = new StringBuilder();
 
         prompt.AppendLine(
             "You are a fair and constructive interview coach.");
-
-        prompt.AppendLine(
-            "Only evaluate answers for legitimate and lawful professional activity.");
-
-        prompt.AppendLine(
-            "Do not improve, optimize, correct, or expand an answer in a way that provides instructions or practical guidance for criminal or harmful activity.");
-
-        prompt.AppendLine(
-            "This includes illegal drug production or trafficking, violence, fraud, theft, malicious hacking, human trafficking, illegal weapons activity, or other criminal conduct.");
-
-        prompt.AppendLine(
-            "For legitimate sensitive professions such as cybersecurity, chemistry, medicine, law enforcement, forensics, and engineering, keep feedback lawful, defensive, ethical, safety-focused, and compliance-focused.");
-
-        prompt.AppendLine(
-            "If the supplied role, question, or answer clearly requests harmful or illegal operational guidance, do not provide an improved operational answer.");
 
         prompt.AppendLine(
             "Evaluate the candidate's answer based only on the supplied question, answer, role, and job description.");
@@ -398,7 +292,6 @@ public sealed class InterviewCoachService
         prompt.AppendLine(
             "For behavioural questions, consider the STAR method: situation, task, action, and result.");
 
-        // KEEP THE REST OF YOUR EXISTING METHOD HERE
         prompt.AppendLine();
         prompt.AppendLine("ROLE");
         prompt.AppendLine(
@@ -431,10 +324,7 @@ public sealed class InterviewCoachService
             "Return no more than four improvements.");
 
         prompt.AppendLine(
-            "For legitimate interview content, provide a stronger example answer without inventing qualifications or experience.");
-
-        prompt.AppendLine(
-            "If the content involves illegal or harmful operational activity, do not provide an improved operational answer; instead give a brief safety-focused response.");
+            "Provide a stronger example answer without inventing qualifications or experience.");
 
         prompt.AppendLine(
             "Keep the improved answer under 180 words.");
@@ -443,59 +333,6 @@ public sealed class InterviewCoachService
             "Return valid JSON only.");
 
         return prompt.ToString();
-    }
-
-    private static bool IsAllowedInterviewRole(
-    string? jobTitle,
-    string? jobDescription = null)
-    {
-        string combined =
-            $"{jobTitle} {jobDescription}"
-                .Trim()
-                .ToLowerInvariant();
-
-        string[] prohibitedTerms =
-        [
-            "meth production",
-        "meth producer",
-        "meth manufacturer",
-        "meth lab",
-        "cook meth",
-        "cocaine production",
-        "cocaine manufacturer",
-        "drug trafficking",
-        "drug trafficker",
-        "illegal drug manufacturing",
-
-        "hitman",
-        "contract killer",
-        "assassin for hire",
-        "murder for hire",
-
-        "human trafficker",
-        "human trafficking",
-        "sex trafficking",
-
-        "bomb maker",
-        "bomb making",
-        "illegal arms dealer",
-        "illegal weapons dealer",
-
-        "credit card fraud",
-        "identity theft",
-        "fraud operator",
-        "scam operator",
-
-        "ransomware operator",
-        "malware for theft",
-        "phishing scammer",
-        "credential thief"
-        ];
-
-        return !prohibitedTerms.Any(term =>
-            combined.Contains(
-                term,
-                StringComparison.OrdinalIgnoreCase));
     }
 
     private T ParseJson<T>(
@@ -717,6 +554,9 @@ public sealed class InterviewCoachService
     }
 
     public async Task<VoiceInterviewResponse> EvaluateVoiceAnswerAsync(
+    int userId,
+    int sessionId,
+    int questionId,
     string jobTitle,
     string companyName,
     string jobDescription,
@@ -798,6 +638,8 @@ public sealed class InterviewCoachService
         var evaluationRequest =
             new InterviewAnswerRequest
             {
+                SessionId = sessionId,
+                QuestionId = questionId,
                 JobTitle = jobTitle,
                 CompanyName = companyName,
                 JobDescription = jobDescription,
@@ -808,6 +650,7 @@ public sealed class InterviewCoachService
         InterviewFeedbackResponse feedback =
             await EvaluateAnswerAsync(
                 evaluationRequest,
+                userId,
                 cancellationToken);
 
         return new VoiceInterviewResponse
@@ -815,315 +658,5 @@ public sealed class InterviewCoachService
             Transcription = transcription,
             Feedback = feedback
         };
-    }
-
-    private static readonly string[] GenericInterviewQuestions =
-    {
-        "Tell me about yourself.",
-        "Why are you interested in this role?"
-    };
-
-    private async Task<List<string>> BuildInterviewQuestionsAsync(
-    string role,
-    int totalQuestions,
-    CancellationToken cancellationToken)
-    {
-        var finalQuestions = new List<string>();
-
-        // Q1 and Q2 are always generic
-        finalQuestions.AddRange(
-            GenericInterviewQuestions);
-
-        if (totalQuestions <= 2)
-        {
-            return finalQuestions
-                .Take(totalQuestions)
-                .ToList();
-        }
-
-        try
-        {
-            var scrapedQuestions =
-                await _scraper.ScrapeAsync(
-                    "https://www.indeed.com/career-advice/interviewing/behavioral-interview-questions",
-                    "Indeed",
-                    role,
-                    cancellationToken);
-            var allQuestions =
-                scrapedQuestions
-                    .Where(q =>
-                        !string.IsNullOrWhiteSpace(
-                            q.Question))
-                    .Select(q =>
-                        q.Question.Trim())
-                    .Distinct(
-                        StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-            var roleRelevantQuestions =
-                allQuestions
-                    .Where(q =>
-                        MatchesRole(
-                            q,
-                            role))
-                    .ToList();
-
-            var questionPool =
-                roleRelevantQuestions.Count > 0
-                    ? roleRelevantQuestions
-                    : allQuestions;
-
-            string? scrapedQuestion =
-                questionPool
-                    .OrderBy(_ =>
-                        Guid.NewGuid())
-                    .FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(
-                scrapedQuestion))
-            {
-                finalQuestions.Add(
-                    scrapedQuestion);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Unable to retrieve scraped interview question for role {Role}. Gemini question will be used as fallback.",
-                role);
-        }
-
-        return finalQuestions
-            .Take(totalQuestions)
-            .ToList();
-    }
-
-    private static bool MatchesRole(
-    string question,
-    string? role)
-    {
-        if (string.IsNullOrWhiteSpace(question))
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(role))
-        {
-            return true;
-        }
-
-        string normalizedQuestion =
-            question.ToLowerInvariant();
-
-        string[] roleWords =
-            role
-                .ToLowerInvariant()
-                .Split(
-                    ' ',
-                    StringSplitOptions
-                        .RemoveEmptyEntries);
-
-        return roleWords.Any(
-            word =>
-                word.Length >= 3 &&
-                normalizedQuestion.Contains(
-                    word,
-                    StringComparison.OrdinalIgnoreCase));
-    }
-
-    public async Task<VideoInterviewTranscriptionResponse>
-    TranscribeVideoInterviewAsync(
-        IFormFile videoFile,
-        List<VideoQuestionTiming> timings,
-        CancellationToken cancellationToken = default)
-    {
-        if (videoFile is null ||
-            videoFile.Length == 0)
-        {
-            throw new ArgumentException(
-                "Interview video is required.");
-        }
-
-        if (timings is null ||
-            timings.Count == 0)
-        {
-            throw new ArgumentException(
-                "Question timing data is required.");
-        }
-
-        string contentType =
-    string.IsNullOrWhiteSpace(
-        videoFile.ContentType)
-        ? "video/webm"
-        : videoFile.ContentType;
-
-        if (contentType.StartsWith(
-                "video/webm",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            contentType =
-                "video/webm";
-        }
-        else if (contentType.StartsWith(
-                     "video/mp4",
-                     StringComparison.OrdinalIgnoreCase))
-        {
-            contentType =
-                "video/mp4";
-        }
-        else
-        {
-            throw new ArgumentException(
-                $"Unsupported interview video format: {contentType}");
-        }
-        await using var memoryStream =
-            new MemoryStream();
-
-        await videoFile.CopyToAsync(
-            memoryStream,
-            cancellationToken);
-
-        string timingText =
-            string.Join(
-                Environment.NewLine,
-                timings.Select(t =>
-                {
-                    string start =
-                        ToGeminiTimestamp(
-                            t.AnswerStartedAt);
-
-                    string end =
-                        ToGeminiTimestamp(
-                            t.AnswerEndedAt);
-
-                    return
-                        $"""
-                        Question {t.QuestionNumber}
-                        Question: {t.Question}
-                        Candidate answer time: {start} to {end}
-                        """;
-                }));
-
-        string prompt =
-            $$"""
-            Generate an accurate transcript of the candidate's
-            spoken answers in this job interview video.
-
-            The video contains both visual content and an audio track.
-
-            There are exactly {{timings.Count}} interview questions.
-
-            The candidate's answer windows are:
-
-            {{timingText}}
-
-            Instructions:
-
-            - Listen to the AUDIO TRACK of the video.
-            - Transcribe the candidate's speech.
-            - Use the timestamps above to identify each answer.
-            - Ignore the interviewer's spoken questions.
-            - Preserve the candidate's actual words.
-            - Do not summarize.
-            - Do not improve grammar.
-            - Do not invent words.
-            - Return one answer object for every question.
-            - Only return an empty transcript if there is genuinely
-              no audible candidate speech during that answer window.
-
-            There must be exactly {{timings.Count}} objects
-            in the answers array.
-            """;
-
-        string rawJson =
-            await _geminiService
-                .AnalyzeVideoAsync(
-                    memoryStream.ToArray(),
-                    contentType,
-                    prompt,
-                    cancellationToken);
-        _logger.LogInformation(
-            "Gemini raw video transcription response: {RawJson}",
-            rawJson);
-
-        VideoInterviewTranscriptionResponse response =
-            ParseJson<VideoInterviewTranscriptionResponse>(
-                rawJson,
-                "video interview transcription");
-
-        if (response.Answers == null ||
-            response.Answers.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "Gemini returned no interview transcripts.");
-        }
-
-        foreach (var answer in response.Answers)
-        {
-            _logger.LogInformation(
-                "Transcript Q{QuestionNumber}: {Transcript}",
-                answer.QuestionNumber,
-                answer.Transcript);
-        }
-
-        return response;
-    }
-
-
-    public async Task<string>
-    TranscribeAnswerAudioAsync(
-        byte[] audioBytes,
-        string contentType,
-        CancellationToken cancellationToken = default)
-    {
-        if (audioBytes == null ||
-            audioBytes.Length == 0)
-        {
-            throw new ArgumentException(
-                "Audio data is required.");
-        }
-
-        string normalizedContentType =
-            contentType.StartsWith(
-                "audio/webm",
-                StringComparison.OrdinalIgnoreCase)
-                ? "audio/webm"
-                : contentType;
-
-        string transcript =
-            await _geminiService
-                .TranscribeAudioAsync(
-                    audioBytes,
-                    normalizedContentType,
-                    cancellationToken);
-
-        if (string.IsNullOrWhiteSpace(
-                transcript))
-        {
-            throw new InvalidOperationException(
-                "No speech was detected in the interview answer.");
-        }
-
-        return transcript.Trim();
-    }
-
-    private static string ToGeminiTimestamp(
-    double seconds)
-    {
-        if (seconds < 0)
-        {
-            seconds = 0;
-        }
-
-        int totalSeconds =
-            (int)Math.Floor(seconds);
-
-        int minutes =
-            totalSeconds / 60;
-
-        int remainingSeconds =
-            totalSeconds % 60;
-
-        return $"{minutes:00}:{remainingSeconds:00}";
     }
 }
