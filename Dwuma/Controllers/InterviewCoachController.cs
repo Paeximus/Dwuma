@@ -124,105 +124,78 @@ public sealed class InterviewCoachController : ControllerBase
 
         try
         {
-            var modelPath = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "Piper",
-                "voices",
-                "en_US-ryan-medium.onnx"
+            using var piperRequest = new HttpRequestMessage(
+                HttpMethod.Post,
+                "http://127.0.0.1:5000"
             );
 
-            if (!System.IO.File.Exists(modelPath))
-            {
-                _logger.LogError(
-                    "Piper voice model was not found at {ModelPath}",
-                    modelPath
+            piperRequest.Content = new StringContent(
+                JsonSerializer.Serialize(new
+                {
+                    text = request.Text.Trim()
+                }),
+                Encoding.UTF8,
+                "application/json"
+            );
+
+            using var piperResponse =
+                await ExternalHttpClient.SendAsync(
+                    piperRequest,
+                    cancellationToken
                 );
 
-                return StatusCode(
-                    StatusCodes.Status503ServiceUnavailable,
-                    new
-                    {
-                        message = "The interviewer voice model could not be found."
-                    }
-                );
-            }
-
-            var startInfo = new ProcessStartInfo
+            if (!piperResponse.IsSuccessStatusCode)
             {
-                FileName = "piper",
-                Arguments =
-                    $"-m \"{modelPath}\" --output-raw",
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+                string body =
+                    await piperResponse.Content
+                        .ReadAsStringAsync(
+                            cancellationToken
+                        );
 
-            using var process = new Process
-            {
-                StartInfo = startInfo
-            };
-
-            process.Start();
-
-            await process.StandardInput.WriteLineAsync(
-                request.Text.Trim()
-            );
-
-            process.StandardInput.Close();
-
-            using var audioStream = new MemoryStream();
-
-            await process.StandardOutput.BaseStream.CopyToAsync(
-                audioStream,
-                cancellationToken
-            );
-
-            string errorOutput =
-                await process.StandardError.ReadToEndAsync();
-
-            await process.WaitForExitAsync(
-                cancellationToken
-            );
-
-            if (process.ExitCode != 0)
-            {
-                _logger.LogError(
-                    "Piper TTS failed with exit code {ExitCode}: {Error}",
-                    process.ExitCode,
-                    errorOutput
+                _logger.LogWarning(
+                    "Piper HTTP server failed with status {StatusCode}: {Body}",
+                    piperResponse.StatusCode,
+                    body
                 );
 
                 return StatusCode(
                     StatusCodes.Status502BadGateway,
                     new
                     {
-                        message = "The interviewer voice could not be generated."
+                        message =
+                            "The interviewer voice could not be generated."
                     }
                 );
             }
 
+            byte[] wavAudio =
+                await piperResponse.Content
+                    .ReadAsByteArrayAsync(
+                        cancellationToken
+                    );
+
+            if (wavAudio.Length <= 44)
+            {
+                return StatusCode(
+                    StatusCodes.Status502BadGateway,
+                    new
+                    {
+                        message =
+                            "The interviewer voice contained no audio."
+                    }
+                );
+            }
+
+            // Piper HTTP returns WAV.
+            // Strip the 44-byte WAV header so the frontend receives raw PCM.
             byte[] pcmAudio =
-                audioStream.ToArray();
+                wavAudio[44..];
 
-            if (pcmAudio.Length == 0)
-            {
-                _logger.LogError(
-                    "Piper returned an empty audio response."
-                );
+            Response.Headers["X-Audio-Sample-Rate"] =
+                "22050";
 
-                return StatusCode(
-                    StatusCodes.Status502BadGateway,
-                    new
-                    {
-                        message = "The interviewer voice contained no audio."
-                    }
-                );
-            }
-
-            Response.Headers["X-Audio-Sample-Rate"] = "22050";
-            Response.Headers["Cache-Control"] = "no-store";
+            Response.Headers["Cache-Control"] =
+                "no-store";
 
             return File(
                 pcmAudio,
@@ -234,14 +207,15 @@ public sealed class InterviewCoachController : ControllerBase
         {
             _logger.LogError(
                 ex,
-                "Piper failed while generating interviewer speech."
+                "Piper HTTP speech generation failed."
             );
 
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
                 new
                 {
-                    message = "The interviewer voice could not be generated."
+                    message =
+                        "The interviewer voice could not be generated."
                 }
             );
         }
