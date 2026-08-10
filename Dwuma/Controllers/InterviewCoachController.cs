@@ -146,8 +146,11 @@ public sealed class InterviewCoachController : ControllerBase
             {
                 model = "gemini-3.1-flash-tts-preview",
                 input =
-                    $"Speak as a calm, warm and professional job interviewer. " +
-                    $"Use a natural conversational pace and read the following exactly: {request.Text.Trim()}",
+                    $"You are a professional male job interviewer conducting a formal but friendly interview. " +
+                    $"Speak with a calm, mature, confident male voice. " +
+                    $"Use a natural conversational pace, clear pronunciation, and brief natural pauses. " +
+                    $"Do not sound theatrical, overly cheerful, or robotic. " +
+                    $"Read the following exactly without adding extra words: {request.Text.Trim()}",
                 response_format = new
                 {
                     type = "audio"
@@ -156,7 +159,7 @@ public sealed class InterviewCoachController : ControllerBase
                 {
                     speech_config = new[]
                     {
-                        new { voice = "Kore" }
+                        new { voice = "Charon" }
                     }
                 }
             }),
