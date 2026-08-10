@@ -304,22 +304,6 @@
   },
   {
     "ContainingType": "Dwuma.Controllers.InterviewCoachController",
-    "Method": "TranscribeAnswer",
-    "RelativePath": "api/interview/transcribe-answer",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "AudioFile",
-        "Type": "Microsoft.AspNetCore.Http.IFormFile",
-        "IsRequired": false
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "Dwuma.Controllers.InterviewCoachController",
     "Method": "UploadVideoSession",
     "RelativePath": "api/interview/video-session",
     "HttpMethod": "POST",
