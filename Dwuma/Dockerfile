@@ -25,7 +25,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y python3 python3-pip curl \
-    && pip3 install --break-system-packages piper-tts \
+    && pip3 install --break-system-packages "piper-tts[http]" \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .

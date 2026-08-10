@@ -126,7 +126,7 @@ public sealed class InterviewCoachController : ControllerBase
         {
             using var piperRequest = new HttpRequestMessage(
                 HttpMethod.Post,
-                "http://127.0.0.1:5000"
+                "http://127.0.0.1:5000/synthesize"
             );
 
             piperRequest.Content = new StringContent(
