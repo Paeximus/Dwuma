@@ -136,51 +136,79 @@ public sealed class InterviewCoachController : ControllerBase
         }
 
         using var geminiRequest = new HttpRequestMessage(
-            HttpMethod.Post,
-            "https://generativelanguage.googleapis.com/v1beta/interactions");
+    HttpMethod.Post,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent"
+);
 
-        geminiRequest.Headers.Add("x-goog-api-key", geminiApiKey);
-        geminiRequest.Headers.Add("Api-Revision", "2026-05-20");
+        geminiRequest.Headers.Add(
+            "x-goog-api-key",
+            geminiApiKey
+        );
+
         geminiRequest.Content = new StringContent(
             JsonSerializer.Serialize(new
             {
-                model = "gemini-3.1-flash-tts-preview",
-                input =
-                    $"You are a professional male job interviewer conducting a formal but friendly interview. " +
-                    $"Speak with a calm, mature, confident male voice. " +
-                    $"Use a natural conversational pace, clear pronunciation, and brief natural pauses. " +
-                    $"Do not sound theatrical, overly cheerful, or robotic. " +
-                    $"Read the following exactly without adding extra words: {request.Text.Trim()}",
-                response_format = new
+                contents = new[]
                 {
-                    type = "audio"
-                },
-                generation_config = new
+            new
+            {
+                parts = new[]
                 {
-                    speech_config = new[]
+                    new
                     {
-                        new { voice = "Charon" }
+                        text =
+                            $"You are a professional male job interviewer. " +
+                            $"Speak with a calm, mature and confident tone. " +
+                            $"Use a natural conversational pace and clear pronunciation. " +
+                            $"Read the following exactly without adding extra words: " +
+                            request.Text.Trim()
+                    }
+                }
+            }
+                },
+
+                generationConfig = new
+                {
+                    responseModalities = new[]
+                    {
+                "AUDIO"
+                    },
+
+                    speechConfig = new
+                    {
+                        voiceConfig = new
+                        {
+                            prebuiltVoiceConfig = new
+                            {
+                                voiceName = "Charon"
+                            }
+                        }
                     }
                 }
             }),
             Encoding.UTF8,
-            "application/json");
+            "application/json"
+        );
 
         using HttpResponseMessage geminiResponse =
             await ExternalHttpClient.SendAsync(
                 geminiRequest,
-                cancellationToken);
+                cancellationToken
+            );
 
         string geminiBody =
-            await geminiResponse.Content.ReadAsStringAsync(
-                cancellationToken);
+            await geminiResponse.Content
+                .ReadAsStringAsync(
+                    cancellationToken
+                );
 
         if (!geminiResponse.IsSuccessStatusCode)
         {
             _logger.LogWarning(
                 "Gemini TTS failed with status {StatusCode}: {Body}",
                 geminiResponse.StatusCode,
-                geminiBody);
+                geminiBody
+            );
 
             return StatusCode(
                 StatusCodes.Status502BadGateway,
@@ -188,33 +216,125 @@ public sealed class InterviewCoachController : ControllerBase
                 {
                     message =
                         "The interviewer voice could not be generated."
-                });
+                }
+            );
         }
 
-        using JsonDocument json = JsonDocument.Parse(geminiBody);
+        using JsonDocument json =
+            JsonDocument.Parse(geminiBody);
 
-        if (!json.RootElement.TryGetProperty("output_audio", out JsonElement outputAudio) ||
-            !outputAudio.TryGetProperty("data", out JsonElement dataElement))
+        JsonElement root =
+            json.RootElement;
+
+        if (
+            !root.TryGetProperty(
+                "candidates",
+                out JsonElement candidates
+            ) ||
+            candidates.GetArrayLength() == 0
+        )
         {
+            _logger.LogWarning(
+                "Gemini TTS response had no candidates: {Body}",
+                geminiBody
+            );
+
             return StatusCode(
                 StatusCodes.Status502BadGateway,
                 new
                 {
                     message =
                         "The interviewer voice response did not contain audio."
-                });
+                }
+            );
         }
 
-        byte[] pcmAudio = Convert.FromBase64String(
-            dataElement.GetString() ?? string.Empty);
+        JsonElement candidate =
+            candidates[0];
 
-        Response.Headers["X-Audio-Sample-Rate"] = "24000";
-        Response.Headers["Cache-Control"] = "no-store";
+        if (
+            !candidate.TryGetProperty(
+                "content",
+                out JsonElement content
+            ) ||
+            !content.TryGetProperty(
+                "parts",
+                out JsonElement parts
+            )
+        )
+        {
+            _logger.LogWarning(
+                "Gemini TTS response had no content parts: {Body}",
+                geminiBody
+            );
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message =
+                        "The interviewer voice response did not contain audio."
+                }
+            );
+        }
+
+        string? audioBase64 = null;
+
+        foreach (JsonElement part in parts.EnumerateArray())
+        {
+            if (
+                part.TryGetProperty(
+                    "inlineData",
+                    out JsonElement inlineData
+                ) &&
+                inlineData.TryGetProperty(
+                    "data",
+                    out JsonElement data
+                )
+            )
+            {
+                audioBase64 =
+                    data.GetString();
+
+                break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(audioBase64))
+        {
+            _logger.LogWarning(
+                "Gemini TTS returned no inline audio: {Body}",
+                geminiBody
+            );
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message =
+                        "The interviewer voice response did not contain audio."
+                }
+            );
+        }
+
+        byte[] pcmAudio =
+            Convert.FromBase64String(
+                audioBase64
+            );
+
+        Response.Headers[
+            "X-Audio-Sample-Rate"
+        ] = "24000";
+
+        Response.Headers[
+            "Cache-Control"
+        ] = "no-store";
 
         return File(
             pcmAudio,
             "application/octet-stream",
-            enableRangeProcessing: false);
+            enableRangeProcessing: false
+        );
     }
 
     [HttpPost("questions")]
