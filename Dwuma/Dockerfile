@@ -54,7 +54,7 @@ RUN pip3 install --break-system-packages piper-tts
 COPY --from=build /app/publish .
 
 # Copy Piper voice models
-COPY Piper/voices ./Piper/voices
+COPY Dwuma/Piper/voices ./Piper/voices
 
 ENV ASPNETCORE_URLS=http://0.0.0.0:10000
 
