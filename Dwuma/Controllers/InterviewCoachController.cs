@@ -1,11 +1,13 @@
-using System.Text;
-using System.Text.Json;
+using Dwuma.Extensions;
 using Dwuma.Models.Interview;
 using Dwuma.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Dwuma.Extensions;
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+using System.IO;
 
 namespace Dwuma.Controllers;
 
@@ -109,8 +111,8 @@ public sealed class InterviewCoachController : ControllerBase
     [HttpPost("speech")]
     [DisableRateLimiting]
     public async Task<IActionResult> GenerateInterviewerSpeech(
-        [FromBody] InterviewerSpeechRequest request,
-        CancellationToken cancellationToken)
+    [FromBody] InterviewerSpeechRequest request,
+    CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Text))
         {
@@ -120,221 +122,129 @@ public sealed class InterviewCoachController : ControllerBase
             });
         }
 
-        string? geminiApiKey =
-            _configuration["Gemini:ApiKey"] ??
-            _configuration["GEMINI_API_KEY"];
-
-        if (string.IsNullOrWhiteSpace(geminiApiKey))
+        try
         {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new
-                {
-                    message =
-                        "The interviewer voice is not configured yet."
-                });
-        }
+            var modelPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "Piper",
+                "voices",
+                "en_US-ryan-medium.onnx"
+            );
 
-        using var geminiRequest = new HttpRequestMessage(
-    HttpMethod.Post,
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent"
-);
-
-        geminiRequest.Headers.Add(
-            "x-goog-api-key",
-            geminiApiKey
-        );
-
-        geminiRequest.Content = new StringContent(
-            JsonSerializer.Serialize(new
+            if (!System.IO.File.Exists(modelPath))
             {
-                contents = new[]
-                {
-            new
-            {
-                parts = new[]
-                {
+                _logger.LogError(
+                    "Piper voice model was not found at {ModelPath}",
+                    modelPath
+                );
+
+                return StatusCode(
+                    StatusCodes.Status503ServiceUnavailable,
                     new
                     {
-                        text =
-                            $"You are a professional male job interviewer. " +
-                            $"Speak with a calm, mature and confident tone. " +
-                            $"Use a natural conversational pace and clear pronunciation. " +
-                            $"Read the following exactly without adding extra words: " +
-                            request.Text.Trim()
+                        message = "The interviewer voice model could not be found."
                     }
-                }
+                );
             }
-                },
 
-                generationConfig = new
-                {
-                    responseModalities = new[]
-                    {
-                "AUDIO"
-                    },
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "piper",
+                Arguments =
+                    $"-m \"{modelPath}\" --output-raw",
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
 
-                    speechConfig = new
-                    {
-                        voiceConfig = new
-                        {
-                            prebuiltVoiceConfig = new
-                            {
-                                voiceName = "Charon"
-                            }
-                        }
-                    }
-                }
-            }),
-            Encoding.UTF8,
-            "application/json"
-        );
+            using var process = new Process
+            {
+                StartInfo = startInfo
+            };
 
-        using HttpResponseMessage geminiResponse =
-            await ExternalHttpClient.SendAsync(
-                geminiRequest,
+            process.Start();
+
+            await process.StandardInput.WriteLineAsync(
+                request.Text.Trim()
+            );
+
+            process.StandardInput.Close();
+
+            using var audioStream = new MemoryStream();
+
+            await process.StandardOutput.BaseStream.CopyToAsync(
+                audioStream,
                 cancellationToken
             );
 
-        string geminiBody =
-            await geminiResponse.Content
-                .ReadAsStringAsync(
-                    cancellationToken
+            string errorOutput =
+                await process.StandardError.ReadToEndAsync();
+
+            await process.WaitForExitAsync(
+                cancellationToken
+            );
+
+            if (process.ExitCode != 0)
+            {
+                _logger.LogError(
+                    "Piper TTS failed with exit code {ExitCode}: {Error}",
+                    process.ExitCode,
+                    errorOutput
                 );
 
-        if (!geminiResponse.IsSuccessStatusCode)
-        {
-            _logger.LogWarning(
-                "Gemini TTS failed with status {StatusCode}: {Body}",
-                geminiResponse.StatusCode,
-                geminiBody
-            );
-
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    message =
-                        "The interviewer voice could not be generated."
-                }
-            );
-        }
-
-        using JsonDocument json =
-            JsonDocument.Parse(geminiBody);
-
-        JsonElement root =
-            json.RootElement;
-
-        if (
-            !root.TryGetProperty(
-                "candidates",
-                out JsonElement candidates
-            ) ||
-            candidates.GetArrayLength() == 0
-        )
-        {
-            _logger.LogWarning(
-                "Gemini TTS response had no candidates: {Body}",
-                geminiBody
-            );
-
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    message =
-                        "The interviewer voice response did not contain audio."
-                }
-            );
-        }
-
-        JsonElement candidate =
-            candidates[0];
-
-        if (
-            !candidate.TryGetProperty(
-                "content",
-                out JsonElement content
-            ) ||
-            !content.TryGetProperty(
-                "parts",
-                out JsonElement parts
-            )
-        )
-        {
-            _logger.LogWarning(
-                "Gemini TTS response had no content parts: {Body}",
-                geminiBody
-            );
-
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    message =
-                        "The interviewer voice response did not contain audio."
-                }
-            );
-        }
-
-        string? audioBase64 = null;
-
-        foreach (JsonElement part in parts.EnumerateArray())
-        {
-            if (
-                part.TryGetProperty(
-                    "inlineData",
-                    out JsonElement inlineData
-                ) &&
-                inlineData.TryGetProperty(
-                    "data",
-                    out JsonElement data
-                )
-            )
-            {
-                audioBase64 =
-                    data.GetString();
-
-                break;
+                return StatusCode(
+                    StatusCodes.Status502BadGateway,
+                    new
+                    {
+                        message = "The interviewer voice could not be generated."
+                    }
+                );
             }
-        }
 
-        if (string.IsNullOrWhiteSpace(audioBase64))
+            byte[] pcmAudio =
+                audioStream.ToArray();
+
+            if (pcmAudio.Length == 0)
+            {
+                _logger.LogError(
+                    "Piper returned an empty audio response."
+                );
+
+                return StatusCode(
+                    StatusCodes.Status502BadGateway,
+                    new
+                    {
+                        message = "The interviewer voice contained no audio."
+                    }
+                );
+            }
+
+            Response.Headers["X-Audio-Sample-Rate"] = "22050";
+            Response.Headers["Cache-Control"] = "no-store";
+
+            return File(
+                pcmAudio,
+                "application/octet-stream",
+                enableRangeProcessing: false
+            );
+        }
+        catch (Exception ex)
         {
-            _logger.LogWarning(
-                "Gemini TTS returned no inline audio: {Body}",
-                geminiBody
+            _logger.LogError(
+                ex,
+                "Piper failed while generating interviewer speech."
             );
 
             return StatusCode(
-                StatusCodes.Status502BadGateway,
+                StatusCodes.Status500InternalServerError,
                 new
                 {
-                    message =
-                        "The interviewer voice response did not contain audio."
+                    message = "The interviewer voice could not be generated."
                 }
             );
         }
-
-        byte[] pcmAudio =
-            Convert.FromBase64String(
-                audioBase64
-            );
-
-        Response.Headers[
-            "X-Audio-Sample-Rate"
-        ] = "24000";
-
-        Response.Headers[
-            "Cache-Control"
-        ] = "no-store";
-
-        return File(
-            pcmAudio,
-            "application/octet-stream",
-            enableRangeProcessing: false
-        );
     }
 
     [HttpPost("video-session")]

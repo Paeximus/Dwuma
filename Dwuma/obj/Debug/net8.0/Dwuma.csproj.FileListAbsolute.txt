@@ -125,7 +125,6 @@ D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\staticwebassets.build.json
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\staticwebassets.build.json.cache
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\staticwebassets.development.json
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\staticwebassets.build.endpoints.json
-D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\Dwuma.csproj.Up2Date
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\Dwuma.dll
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\refint\Dwuma.dll
@@ -134,3 +133,4 @@ D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\Dwuma.pdb
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\Dwuma.genruntimeconfig.cache
 D:\COE4\FATE\Dwuma\Dwuma\obj\Debug\net8.0\ref\Dwuma.dll
 D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\AngleSharp.dll
+D:\COE4\FATE\Dwuma\Dwuma\bin\Debug\net8.0\Piper\Voices\en_US-ryan-medium.onnx.json
