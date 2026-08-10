@@ -337,6 +337,105 @@ public sealed class InterviewCoachController : ControllerBase
         );
     }
 
+    [HttpPost("video-session")]
+    [DisableRateLimiting]
+    [RequestSizeLimit(200_000_000)]
+    public async Task<IActionResult> UploadVideoSession(
+    [FromForm] InterviewVideoSessionRequest request,
+    CancellationToken cancellationToken)
+    {
+        if (request.VideoFile == null ||
+            request.VideoFile.Length == 0)
+        {
+            return BadRequest(new
+            {
+                message = "Interview video is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.SessionId))
+        {
+            return BadRequest(new
+            {
+                message = "Interview session ID is required."
+            });
+        }
+
+        try
+        {
+            var uploadsFolder = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "Uploads",
+                "Interviews"
+            );
+
+            Directory.CreateDirectory(uploadsFolder);
+
+            var fileName =
+                $"{request.SessionId}_{Guid.NewGuid()}.webm";
+
+            var filePath =
+                Path.Combine(
+                    uploadsFolder,
+                    fileName
+                );
+
+            await using (
+                var stream =
+                    new FileStream(
+                        filePath,
+                        FileMode.Create
+                    )
+            )
+            {
+                await request.VideoFile.CopyToAsync(
+                    stream,
+                    cancellationToken
+                );
+            }
+
+            _logger.LogInformation(
+                "Interview video uploaded. Session: {SessionId}, File: {FileName}",
+                request.SessionId,
+                fileName
+            );
+
+            return Ok(new
+            {
+                message =
+                    "Interview video uploaded successfully.",
+
+                sessionId =
+                    request.SessionId,
+
+                fileName,
+
+                videoSize =
+                    request.VideoFile.Length,
+
+                questionTimingsJson =
+                    request.QuestionTimingsJson
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Unable to upload interview video for session {SessionId}",
+                request.SessionId
+            );
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    message =
+                        "The interview video could not be uploaded."
+                }
+            );
+        }
+    }
+
     [HttpPost("questions")]
     [ProducesResponseType(
         typeof(InterviewQuestionResponse),
