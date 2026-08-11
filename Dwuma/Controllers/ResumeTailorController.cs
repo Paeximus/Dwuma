@@ -169,74 +169,52 @@ namespace Dwuma.Controllers
             StatusCodes.Status400BadRequest)]
         [ProducesResponseType(
             StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Download(
-            [FromBody] DownloadRequest request)
+        [HttpPost("download")]
+        public async Task<IActionResult> DownloadTailoredCv(
+        [FromBody] DownloadRequest request)
         {
-            if (string.IsNullOrWhiteSpace(
-                    request.TailoredCv))
-            {
-                return BadRequest(new
-                {
-                    message =
-                        "No CV content provided."
-                });
-            }
-
             try
             {
-                request.TailoredCv =
-                    _tailorService
-                        .NormalizeTailoredCvText(
-                            request.TailoredCv);
-
-                byte[] docxBytes =
-                    await _tailorService
-                        .GenerateDocxAsync(
-                            request);
-
-                string safeJobTitle =
-                    string.IsNullOrWhiteSpace(
-                        request.JobTitle)
-                        ? "Tailored"
-                        : request.JobTitle.Trim();
-
-                foreach (char invalidChar
-                         in Path.GetInvalidFileNameChars())
+                if (request == null ||
+                    string.IsNullOrWhiteSpace(request.TailoredCv))
                 {
-                    safeJobTitle =
-                        safeJobTitle.Replace(
-                            invalidChar,
-                            '_');
+                    return BadRequest(new
+                    {
+                        message = "Tailored CV content is required."
+                    });
                 }
 
-                safeJobTitle =
-                    safeJobTitle.Replace(
-                        " ",
-                        "_");
+                byte[] document =
+                    await _tailorService
+                        .GenerateDocxAsync(request);
 
-                string fileName =
-                    $"DWUMA_CV_{safeJobTitle}.docx";
+                const string contentType =
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+                const string fileName =
+                    "DWUMA_Tailored_CV.docx";
 
                 return File(
-                    docxBytes,
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    document,
+                    contentType,
                     fileName);
             }
             catch (Exception ex)
             {
                 _logger.LogError(
                     ex,
-                    "DOCX generation failed.");
+                    "Failed to generate tailored CV DOCX.");
 
                 return StatusCode(
                     StatusCodes.Status500InternalServerError,
                     new
                     {
                         message =
-                            "Could not generate document."
+                            "The tailored CV document could not be generated."
                     });
             }
         }
+
 
         private int GetUserId()
         {
