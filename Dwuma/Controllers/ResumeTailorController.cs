@@ -12,12 +12,14 @@ namespace Dwuma.Controllers
     [Authorize]
     [EnableRateLimiting("ai-policy")]
     [Route("api/[controller]")]
-    [Produces("application/json")]
     public class ResumeTailorController : ControllerBase
     {
         private readonly ResumeTailorService _tailorService;
         private readonly ILogger<ResumeTailorController> _logger;
         private readonly NotificationService _notificationService;
+
+        private const string DocxContentType =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
         public ResumeTailorController(
             ResumeTailorService tailorService,
@@ -30,16 +32,20 @@ namespace Dwuma.Controllers
         }
 
         // ==========================================
-        // UPLOAD + PARSE + TAILOR IN ONE ENDPOINT
+        // UPLOAD + PARSE + TAILOR
+        // POST /api/ResumeTailor/tailor
         // ==========================================
 
         [HttpPost("tailor")]
         [Consumes("multipart/form-data")]
+        [Produces("application/json")]
         [ProducesResponseType(
             typeof(TailorResponse),
             StatusCodes.Status200OK)]
         [ProducesResponseType(
             StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(
+            StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(
             StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Tailor(
@@ -93,11 +99,12 @@ namespace Dwuma.Controllers
                         .CleanParsedCvText(
                             parsedText);
 
-                // 3. Build the existing tailoring request
+                // 3. Build tailoring request
                 var tailorRequest =
                     new TailorRequest
                     {
                         CvText = cleanedCv,
+
                         JobTitle =
                             request.JobTitle.Trim(),
 
@@ -110,13 +117,14 @@ namespace Dwuma.Controllers
                                 .Trim()
                     };
 
-                // 4. Tailor CV
+                // 4. Tailor CV with Gemini
                 TailorResponse result =
                     await _tailorService
                         .TailorAsync(
-                            tailorRequest);
+                            tailorRequest,
+                            cancellationToken);
 
-                // 5. Fix spacing/formatting
+                // 5. Normalize returned CV text
                 result.TailoredCv =
                     _tailorService
                         .NormalizeTailoredCvText(
@@ -125,12 +133,16 @@ namespace Dwuma.Controllers
                 // 6. Create notification
                 int userId = GetUserId();
 
-                await _notificationService.CreatePersonalizedAsync(
-                     userId,
-                     "CV",
-                     $"your CV for {request.JobTitle} has been tailored and is ready to download.",
-                     cancellationToken);
+                await _notificationService
+                    .CreatePersonalizedAsync(
+                        userId,
+                        "CV",
+                        $"Your CV for {request.JobTitle.Trim()} has been tailored and is ready to download.",
+                        cancellationToken);
 
+                // Important:
+                // This remains JSON because the frontend still
+                // needs the tailored CV, ATS score, changelog, etc.
                 return Ok(result);
             }
             catch (ArgumentException ex)
@@ -139,6 +151,23 @@ namespace Dwuma.Controllers
                 {
                     message = ex.Message
                 });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                return StatusCode(
+                    StatusCodes.Status408RequestTimeout,
+                    new
+                    {
+                        message =
+                            "The CV tailoring request was cancelled."
+                    });
             }
             catch (Exception ex)
             {
@@ -158,46 +187,67 @@ namespace Dwuma.Controllers
         }
 
         // ==========================================
-        // DOWNLOAD FORMATTED DOCX
+        // DOWNLOAD TAILORED CV AS DOCX
+        // POST /api/ResumeTailor/download
         // ==========================================
 
         [HttpPost("download")]
+        [Consumes("application/json")]
+        [Produces(DocxContentType)]
         [ProducesResponseType(
             typeof(FileContentResult),
             StatusCodes.Status200OK)]
         [ProducesResponseType(
             StatusCodes.Status400BadRequest)]
         [ProducesResponseType(
+            StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(
             StatusCodes.Status500InternalServerError)]
-        [HttpPost("download")]
         public async Task<IActionResult> DownloadTailoredCv(
-        [FromBody] DownloadRequest request)
+            [FromBody] DownloadRequest request)
         {
+            if (request == null ||
+                string.IsNullOrWhiteSpace(
+                    request.TailoredCv))
+            {
+                return BadRequest(new
+                {
+                    message =
+                        "Tailored CV content is required."
+                });
+            }
+
             try
             {
-                if (request == null ||
-                    string.IsNullOrWhiteSpace(request.TailoredCv))
-                {
-                    return BadRequest(new
-                    {
-                        message = "Tailored CV content is required."
-                    });
-                }
-
                 byte[] document =
                     await _tailorService
                         .GenerateDocxAsync(request);
 
-                const string contentType =
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                if (document.Length == 0)
+                {
+                    return StatusCode(
+                        StatusCodes.Status500InternalServerError,
+                        new
+                        {
+                            message =
+                                "The generated CV document was empty."
+                        });
+                }
 
-                const string fileName =
-                    "DWUMA_Tailored_CV.docx";
+                string fileName =
+                    $"DWUMA_Tailored_CV_{DateTime.UtcNow:yyyyMMdd_HHmmss}.docx";
 
                 return File(
                     document,
-                    contentType,
+                    DocxContentType,
                     fileName);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
             }
             catch (Exception ex)
             {
@@ -215,6 +265,9 @@ namespace Dwuma.Controllers
             }
         }
 
+        // ==========================================
+        // CURRENT USER
+        // ==========================================
 
         private int GetUserId()
         {
@@ -233,6 +286,10 @@ namespace Dwuma.Controllers
             return userId;
         }
     }
+
+    // ==========================================
+    // MULTIPART FORM REQUEST
+    // ==========================================
 
     public sealed class TailorCvRequest
     {
