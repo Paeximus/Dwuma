@@ -142,7 +142,7 @@ public sealed class AuthService
         string frontendBaseUrl =
             _configuration[
                 "Email:FrontendBaseUrl"]
-            ?? "http://localhost:5173";
+            ?? "https://project-la6nn.vercel.app";
 
         string verificationLink =
             $"{frontendBaseUrl.TrimEnd('/')}" +
@@ -440,7 +440,7 @@ public sealed class AuthService
         string frontendBaseUrl =
             _configuration[
                 "Email:FrontendBaseUrl"]
-            ?? "http://localhost:5173";
+            ?? "https://project-la6nn.vercel.app";
 
         string verificationLink =
             $"{frontendBaseUrl.TrimEnd('/')}" +
