@@ -223,100 +223,174 @@ public sealed class InterviewCoachController : ControllerBase
 
     [HttpPost("video-session")]
     [DisableRateLimiting]
-    [RequestSizeLimit(200_000_000)]
-    public async Task<IActionResult> UploadVideoSession(
-    [FromForm] InterviewVideoSessionRequest request,
-    CancellationToken cancellationToken)
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(60_000_000)]
+    public async Task<IActionResult> ProcessVideoSession(
+        [FromForm] InterviewVideoSessionRequest request,
+        CancellationToken cancellationToken)
     {
         if (request.VideoFile == null ||
             request.VideoFile.Length == 0)
         {
             return BadRequest(new
             {
-                message = "Interview video is required."
+                message =
+                    "Interview video is required."
             });
         }
 
-        if (string.IsNullOrWhiteSpace(request.SessionId))
+        if (string.IsNullOrWhiteSpace(
+            request.SessionId))
         {
             return BadRequest(new
             {
-                message = "Interview session ID is required."
+                message =
+                    "Interview session ID is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(
+            request.QuestionTimingsJson))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Question timing information is required."
+            });
+        }
+
+        string contentType =
+            request.VideoFile.ContentType?
+                .ToLowerInvariant()
+            ?? string.Empty;
+
+        string extension =
+            Path.GetExtension(
+                request.VideoFile.FileName)
+            .ToLowerInvariant();
+
+        bool supportedVideo =
+            contentType.StartsWith(
+                "video/webm") ||
+            contentType.StartsWith(
+                "video/mp4") ||
+            extension == ".webm" ||
+            extension == ".mp4";
+
+        if (!supportedVideo)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Only WebM or MP4 interview recordings are supported."
+            });
+        }
+
+        List<VideoQuestionTiming>? timings;
+
+        try
+        {
+            timings =
+                JsonSerializer.Deserialize<
+                    List<VideoQuestionTiming>>(
+                    request.QuestionTimingsJson,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive =
+                            true
+                    });
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Invalid interview question timing JSON.");
+
+            return BadRequest(new
+            {
+                message =
+                    "Question timing information is invalid."
+            });
+        }
+
+        if (timings == null ||
+            timings.Count == 0)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "At least one question timing is required."
             });
         }
 
         try
         {
-            var uploadsFolder = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "Uploads",
-                "Interviews"
-            );
-
-            Directory.CreateDirectory(uploadsFolder);
-
-            var fileName =
-                $"{request.SessionId}_{Guid.NewGuid()}.webm";
-
-            var filePath =
-                Path.Combine(
-                    uploadsFolder,
-                    fileName
-                );
-
-            await using (
-                var stream =
-                    new FileStream(
-                        filePath,
-                        FileMode.Create
-                    )
-            )
-            {
-                await request.VideoFile.CopyToAsync(
-                    stream,
-                    cancellationToken
-                );
-            }
+            VideoInterviewProcessingResponse analysis =
+                await _interviewCoach
+                    .ProcessVideoInterviewAsync(
+                        request.VideoFile,
+                        timings,
+                        cancellationToken);
 
             _logger.LogInformation(
-                "Interview video uploaded. Session: {SessionId}, File: {FileName}",
+                "Interview video processed successfully. Session: {SessionId}, Questions: {QuestionCount}",
                 request.SessionId,
-                fileName
-            );
+                timings.Count);
 
             return Ok(new
             {
                 message =
-                    "Interview video uploaded successfully.",
+                    "Interview video processed successfully.",
 
                 sessionId =
                     request.SessionId,
 
-                fileName,
+                questionCount =
+                    timings.Count,
 
-                videoSize =
-                    request.VideoFile.Length,
+                answers =
+                    analysis.Answers,
 
-                questionTimingsJson =
-                    request.QuestionTimingsJson
+                overallVideoFeedback =
+                    analysis.OverallVideoFeedback
             });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Interview video processing failed. Session: {SessionId}",
+                request.SessionId);
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message =
+                        "The interview video could not be analysed."
+                });
         }
         catch (Exception ex)
         {
             _logger.LogError(
                 ex,
-                "Unable to upload interview video for session {SessionId}",
-                request.SessionId
-            );
+                "Unexpected interview video processing failure. Session: {SessionId}",
+                request.SessionId);
 
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
                 new
                 {
                     message =
-                        "The interview video could not be uploaded."
-                }
-            );
+                        "The interview video could not be processed."
+                });
         }
     }
 

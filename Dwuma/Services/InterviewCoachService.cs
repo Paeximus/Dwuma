@@ -788,4 +788,218 @@ public sealed class InterviewCoachService
             normalizedQuestion.Contains(word, StringComparison.OrdinalIgnoreCase));
     }
 
+    public async Task<VideoInterviewProcessingResponse>
+    ProcessVideoInterviewAsync(
+        IFormFile videoFile,
+        List<VideoQuestionTiming> timings,
+        CancellationToken cancellationToken = default)
+    {
+        if (videoFile is null ||
+            videoFile.Length == 0)
+        {
+            throw new ArgumentException(
+                "Interview video is required.");
+        }
+
+        if (timings is null ||
+            timings.Count == 0)
+        {
+            throw new ArgumentException(
+                "Question timing data is required.");
+        }
+
+        string contentType =
+            string.IsNullOrWhiteSpace(
+                videoFile.ContentType)
+                ? "video/webm"
+                : videoFile.ContentType;
+
+        if (contentType.StartsWith(
+                "video/webm",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            contentType = "video/webm";
+        }
+        else if (contentType.StartsWith(
+                     "video/mp4",
+                     StringComparison.OrdinalIgnoreCase))
+        {
+            contentType = "video/mp4";
+        }
+        else
+        {
+            throw new ArgumentException(
+                $"Unsupported interview video format: {contentType}");
+        }
+
+        await using var memoryStream =
+            new MemoryStream();
+
+        await videoFile.CopyToAsync(
+            memoryStream,
+            cancellationToken);
+
+        string timingText =
+            string.Join(
+                Environment.NewLine,
+                timings.Select(t =>
+                {
+                    string start =
+                        ToGeminiTimestamp(
+                            t.AnswerStartedAt);
+
+                    string end =
+                        ToGeminiTimestamp(
+                            t.AnswerEndedAt);
+
+                    return $"""
+                    Question {t.QuestionNumber}
+                    Question ID: {t.QuestionId}
+                    Question: {t.Question}
+                    Candidate answer time: {start} to {end}
+                    """;
+                }));
+
+        string prompt =
+            $$"""
+        You are an interview presentation coach.
+
+        Analyse this recorded practice job interview.
+
+        The recording contains the candidate's webcam video
+        and microphone audio.
+
+        There are exactly {{timings.Count}} interview questions.
+
+        ANSWER WINDOWS
+
+        {{timingText}}
+
+        AUDIO ANALYSIS
+
+        For each answer:
+
+        - Transcribe only the candidate's speech.
+        - Use the provided answer time window.
+        - Ignore the interviewer's speech.
+        - Preserve the candidate's actual words.
+        - Do not improve grammar.
+        - Do not summarize the transcript.
+        - Do not invent missing speech.
+
+        VISUAL DELIVERY ANALYSIS
+
+        For each answer, provide coaching observations based
+        only on behaviour clearly visible in the video.
+
+        You may comment on:
+
+        - whether the candidate is clearly visible
+        - camera framing
+        - whether the candidate generally faces the camera
+        - posture consistency
+        - excessive visible movement
+        - distracting background activity
+        - lighting and video visibility
+        - presentation improvements
+
+        IMPORTANT SAFETY AND FAIRNESS RULES
+
+        - Do not infer personality.
+        - Do not infer confidence, anxiety, nervousness,
+          honesty, intelligence, competence or emotion.
+        - Do not infer health or disability.
+        - Do not make hiring recommendations.
+        - Do not judge physical appearance.
+        - Do not mention race, ethnicity, gender, age,
+          religion or other personal characteristics.
+        - Do not penalise natural gestures.
+        - Only describe observable presentation behaviour.
+        - Treat this strictly as practice coaching feedback.
+
+        Return valid JSON only:
+
+        {
+          "answers": [
+            {
+              "questionId": 1,
+              "questionNumber": 1,
+              "question": "Question text",
+              "transcript": "Candidate answer",
+              "answerStartedAt": 10.5,
+              "answerEndedAt": 35.8,
+              "visualFeedback": {
+                "cameraPresence":
+                    "Observable framing feedback",
+                "cameraAttention":
+                    "Observable camera-facing behaviour",
+                "posture":
+                    "Observable posture feedback",
+                "movement":
+                    "Observable movement feedback",
+                "visibility":
+                    "Lighting and visibility feedback",
+                "strengths": [
+                    "Observable presentation strength"
+                ],
+                "improvements": [
+                    "Practical presentation improvement"
+                ],
+                "deliveryTip":
+                    "One concise actionable tip"
+              }
+            }
+          ],
+          "overallVideoFeedback":
+              "Short overall presentation coaching summary."
+        }
+
+        There must be exactly {{timings.Count}}
+        answer objects.
+        """;
+
+        string rawJson =
+            await _geminiService.AnalyzeVideoAsync(
+                memoryStream.ToArray(),
+                contentType,
+                prompt,
+                cancellationToken);
+
+        VideoInterviewProcessingResponse response =
+            ParseJson<VideoInterviewProcessingResponse>(
+                rawJson,
+                "video interview processing");
+
+        response.Answers ??= [];
+
+        if (response.Answers.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Gemini returned no interview analysis.");
+        }
+
+        return response;
+    }
+
+    private static string ToGeminiTimestamp(
+    double seconds)
+    {
+        if (seconds < 0)
+        {
+            seconds = 0;
+        }
+
+        int totalSeconds =
+            (int)Math.Floor(seconds);
+
+        int minutes =
+            totalSeconds / 60;
+
+        int remainingSeconds =
+            totalSeconds % 60;
+
+        return
+            $"{minutes:00}:{remainingSeconds:00}";
+    }
+
 }
