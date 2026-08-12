@@ -203,19 +203,32 @@ builder.Services.AddHttpClient<
 //});
 
 
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("FrontendPolicy", policy =>
+//    {
+//        policy
+//            .WithOrigins(
+//                "https://project-la6nn.vercel.app",
+//                "http://localhost:5173",
+//                "*"
+//            )
+//            .AllowAnyHeader()
+//            .AllowAnyMethod();
+//    });
+//});
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("FrontendPolicy", policy =>
-    {
-        policy
-            .WithOrigins(
-                "https://project-la6nn.vercel.app",
-                "http://localhost:5173",
-                "*"
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
+    options.AddPolicy(
+        "AllowAll",
+        policy =>
+        {
+            policy
+                .AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
 });
 
 string jwtKey =
@@ -417,7 +430,7 @@ if (app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
-app.UseCors("FrontendPolicy");
+app.UseCors("AllowAll");
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
