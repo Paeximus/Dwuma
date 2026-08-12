@@ -803,76 +803,92 @@ namespace Dwuma.Services
     13. Do not exaggerate academic or personal projects as commercial, production, or professional experience.
     14. Describe academic and personal project experience as project-based experience where appropriate.
     15. Do not add inferred outcomes such as improved quality, increased usability, ensured integrity, enhanced performance, strengthened collaboration, or increased reliability unless the original CV explicitly states those outcomes.
-    16. Do not change a factual verb into a stronger verb unless the original CV supports it.
+    16. You may replace weak or informal verbs with professional action verbs when the new verb accurately describes the same activity stated in the original CV. Do not increase the candidate's level of responsibility, ownership, or achievement.
     17. Do not change "developed" into "designed and developed" unless both activities are explicitly stated.
     18. Do not claim the candidate led, managed, owned, architected, delivered, or drove work unless the original CV explicitly says so.
     19. Do not describe a system as robust, scalable, production-ready, secure, high-performance, or enterprise-grade unless the original CV explicitly supports that description.
     20. Do not transform participation into ownership or assistance into leadership.
 
+        TAILORING TRANSFORMATION RULES:
+
+    21. The tailored CV must be meaningfully rewritten and reorganised for the target role while preserving factual accuracy.
+    22. Do not simply reproduce the original CV with minor grammatical corrections.
+    23. Rewrite existing experience and project bullets to emphasise aspects most relevant to the target job.
+    24. Reorder skills so the most relevant supported skills appear first.
+    25. Reorder projects and experience entries when doing so improves relevance to the target role.
+    26. Rewrite the professional summary specifically for the target job using only evidence from the original CV.
+    27. Remove or shorten low-relevance wording when necessary to make job-relevant information more prominent.
+    28. Convert vague or poorly structured sentences into concise professional CV bullet points without changing their factual meaning.
+    29. You may combine closely related facts from the same role or project into a stronger, clearer bullet, provided no new information is introduced.
+    30. You may use terminology from the job description when it accurately describes something already demonstrated in the original CV.
+    31. Prefer job-relevant terminology over generic wording where both expressions have the same factual meaning.
+    32. The final CV should visibly differ from the original in organisation, emphasis, wording, and prioritisation whenever the original information allows it.
+    33. Do not make changes merely for visual difference. Every change must improve relevance, clarity, ATS compatibility, or professional presentation.
+    34. When sufficient relevant information exists, rewrite at least the professional summary and the most relevant experience/project bullets rather than returning them unchanged.
+
     ATS RULES:
 
-    21. Improve ATS keyword alignment using only keywords supported by the original CV.
-    22. Reorder existing skills and experience to prioritise information relevant to the job.
-    23. Use clear section headings and concise bullet points.
-    24. Use achievement-oriented wording only where the original CV contains a genuine result or contribution.
-    25. Missing job keywords must be reported in "missingKeywords", not inserted into "tailoredCv".
-    26. The ATS score must reflect the candidate's actual match before adding any missing skills.
-    27. Keep the tailored CV professional, concise, and suitable for the stated role.
-    28. Matched keywords must appear directly in or be clearly supported by the original CV.
-    29. Do not count unsupported synonyms as matched keywords.
-    30. Keep the ATS score realistic and do not inflate it because the CV has been rewritten.
-
+    35. Improve ATS keyword alignment by identifying terminology in the job description that is equivalent to facts already demonstrated in the original CV. Use that terminology naturally where factually justified.
+    36. Reorder existing skills and experience to prioritise information relevant to the job.
+    37. Use clear section headings and concise bullet points.
+    38. Use achievement-oriented wording only where the original CV contains a genuine result or contribution.
+    39. Missing job keywords must be reported in "missingKeywords", not inserted into "tailoredCv".
+    40. The ATS score must reflect the candidate's actual match before adding any missing skills.
+    41. Keep the tailored CV professional, concise, and suitable for the stated role.
+    42. Matched keywords must appear directly in or be clearly supported by the original CV.
+    43. Do not count unsupported synonyms as matched keywords.
+    44. Keep the ATS score realistic and do not inflate it because the CV has been rewritten.
     TOKEN-SAVING RULES:
 
-    31. Keep the tailored CV close to the original CV's length.
-    32. Do not repeat the same information in multiple sections.
-    33. Keep the ATS summary under 80 words.
-    34. Return no more than 12 matched keywords.
-    35. Return no more than 10 missing keywords.
-    36. Return no more than 8 changelog items.
-    37. Keep each changelog reason under 25 words.
-    38. Avoid unnecessary explanations and long introductory text.
+    45. Keep the tailored CV concise, but allow reasonable restructuring, rewriting, and expansion where needed to clearly present existing experience relevant to the target role.
+    46. Do not repeat the same information in multiple sections.
+    47. Keep the ATS summary under 80 words.
+    48. Return no more than 12 matched keywords.
+    49. Return no more than 10 missing keywords.
+    50. Return no more than 8 changelog items.
+    51. Keep each changelog reason under 25 words.
+    52. Avoid unnecessary explanations and long introductory text.
 
     CV FORMATTING RULES:
 
-    39. Return the complete CV content in "tailoredCv".
-    40. Preserve the candidate's name and contact information.
-    41. Put each major CV section heading on its own line.
-    42. Separate major sections using exactly one blank line.
-    43. Use concise bullet points for experience, projects, achievements, and responsibilities.
-    44. Each bullet point must appear on its own line.
-    45. Do not combine multiple experience bullets into a paragraph.
-    46. Keep employer, role, institution, qualification, and date information clearly separated.
-    47. Do not use tables.
-    48. Do not use Markdown headings such as #, ##, or ###.
-    49. Do not use Markdown bold markers such as **.
-    50. Do not use code fences.
-    51. Use these section names when the corresponding information exists:
+    53. Return the complete CV content in "tailoredCv".
+    54. Preserve the candidate's name and contact information.
+    55. Put each major CV section heading on its own line.
+    56. Separate major sections using exactly one blank line.
+    57. Use concise bullet points for experience, projects, achievements, and responsibilities.
+    58. Each bullet point must appear on its own line.
+    59. Do not combine multiple experience bullets into a paragraph.
+    60. Keep employer, role, institution, qualification, and date information clearly separated.
+    61. Do not use tables.
+    62. Do not use Markdown headings such as #, ##, or ###.
+    63. Do not use Markdown bold markers such as **.
+    64. Do not use code fences.
+    65. Use these section names when the corresponding information exists:
         PROFESSIONAL SUMMARY
         SKILLS
         WORK EXPERIENCE
         PROJECTS
         EDUCATION
         CERTIFICATIONS
-    52. Do not create a section when the original CV contains no information for that section.
-    53. Preserve readable whitespace and logical section ordering.
+    66. Do not create a section when the original CV contains no information for that section.
+    67. Preserve readable whitespace and logical section ordering.
 
     JSON OUTPUT RULES:
 
-    39. Return only one valid JSON object.
-    40. Do not return Markdown.
-    41. Do not return code fences.
-    42. Do not include explanations before or after the JSON.
-    43. Escape all line breaks inside "tailoredCv" using \n.
-    44. Escape quotation marks inside JSON strings.
-    45. Ensure the response can be parsed by System.Text.Json.
-    46. "matchedKeywords" must contain only keywords supported by the original CV.
-    47. "missingKeywords" must contain important job requirements not supported by the original CV.
-    48. Each changelog item must describe a real change made to the CV.
-    49. Do not place unsupported skills inside "tailoredCv" and also list them as missing.
-    50. Return an ATS score between 0 and 100.
-    51. Return arrays even when they are empty.
-    52. Do not return null values.
+    68. Return only one valid JSON object.
+    69. Do not return Markdown.
+    70. Do not return code fences.
+    71. Do not include explanations before or after the JSON.
+    72. Escape all line breaks inside "tailoredCv" using \n.
+    73. Escape quotation marks inside JSON strings.
+    74. Ensure the response can be parsed by System.Text.Json.
+    75. "matchedKeywords" must contain only keywords supported by the original CV.
+    76. "missingKeywords" must contain important job requirements not supported by the original CV.
+    77. Each changelog item must describe a real change made to the CV.
+    78. Do not place unsupported skills inside "tailoredCv" and also list them as missing.
+    79. Return an ATS score between 0 and 100.
+    80. Return arrays even when they are empty.
+    81. Do not return null values.
 
     TARGET JOB
 
