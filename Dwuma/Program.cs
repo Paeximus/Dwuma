@@ -186,7 +186,7 @@ builder.Services.AddCors(options =>
             {
                 policy
                     .WithOrigins(
-                        "*")
+                        "https://project-la6nn.vercel.app")
                     .AllowAnyHeader()
                     .AllowAnyMethod();
 
