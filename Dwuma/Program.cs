@@ -170,36 +170,51 @@ builder.Services.AddHttpClient<
                 "DwumaInterviewResearch/1.0");
     });
 
-string[] allowedOrigins =
-    builder.Configuration
-        .GetSection("Cors:AllowedOrigins")
-        .Get<string[]>()
-    ?? [];
+//string[] allowedOrigins =
+//    builder.Configuration
+//        .GetSection("Cors:AllowedOrigins")
+//        .Get<string[]>()
+//    ?? [];
+
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy(
+//        "FrontendPolicy",
+//        policy =>
+//        {
+//            if (allowedOrigins.Length == 0)
+//            {
+//                policy
+//                    .WithOrigins(
+//                        "https://project-la6nn.vercel.app",
+//                        "http://localhost:5173"
+//                        )
+//                    .AllowAnyHeader()
+//                    .AllowAnyMethod();
+
+//                return;
+//            }
+
+//            policy
+//                .WithOrigins(allowedOrigins)
+//                .AllowAnyHeader()
+//                .AllowAnyMethod();
+//        });
+//});
+
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(
-        "FrontendPolicy",
-        policy =>
-        {
-            if (allowedOrigins.Length == 0)
-            {
-                policy
-                    .WithOrigins(
-                        "https://project-la6nn.vercel.app",
-                        "http://localhost:5173"
-                        )
-                    .AllowAnyHeader()
-                    .AllowAnyMethod();
-
-                return;
-            }
-
-            policy
-                .WithOrigins(allowedOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod();
-        });
+    options.AddPolicy("FrontendPolicy", policy =>
+    {
+        policy
+            .WithOrigins(
+                "https://project-la6nn.vercel.app",
+                "http://localhost:5173"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
 });
 
 builder.Services.Configure<
@@ -341,15 +356,6 @@ builder.Services.Configure<ForwardedHeadersOptions>(
         options.KnownProxies.Clear();
     });
 
-builder.Services.Configure<
-    Microsoft.AspNetCore.Http.Features
-        .FormOptions>(
-    options =>
-    {
-        options.MultipartBodyLengthLimit =
-            200_000_000;
-    });
-
 
 var app = builder.Build();
 
@@ -378,7 +384,6 @@ var app = builder.Build();
 
 app.UseForwardedHeaders();
 
-app.UseSwagger();
 bool enableSwagger =
     app.Environment.IsDevelopment() ||
     builder.Configuration.GetValue<bool>(
