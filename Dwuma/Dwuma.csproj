@@ -42,7 +42,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Content Include="Piper\voices\**\*">
+		<Content Update="Piper\voices\**\*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Content>

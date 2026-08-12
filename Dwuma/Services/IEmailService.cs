@@ -6,4 +6,10 @@ public interface IEmailService
         string recipientEmail,
         string verificationLink,
         CancellationToken cancellationToken = default);
+
+    Task SendEmailAsync(
+    string recipientEmail,
+    string subject,
+    string message,
+    CancellationToken cancellationToken = default);
 }

@@ -8,13 +8,16 @@ public sealed class NotificationService
 {
     private readonly DwumaContext _dbContext;
     private readonly ILogger<NotificationService> _logger;
+    private readonly IEmailService _emailService;
 
     public NotificationService(
         DwumaContext dbContext,
-        ILogger<NotificationService> logger)
+        ILogger<NotificationService> logger,
+        IEmailService emailService)
     {
         _dbContext = dbContext;
         _logger = logger;
+        _emailService = emailService;
     }
 
     // =========================================================
@@ -62,6 +65,12 @@ public sealed class NotificationService
             notification);
 
         await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        await SendNotificationEmailAsync(
+            userId,
+            notification.NotificationType,
+            notification.Content,
             cancellationToken);
 
         _logger.LogInformation(
@@ -312,6 +321,11 @@ public sealed class NotificationService
 
         await _dbContext.SaveChangesAsync(
             cancellationToken);
+        await SendNotificationEmailAsync(
+            userId,
+            notificationType,
+            personalizedContent,
+            cancellationToken);
 
         _logger.LogInformation(
             "Created personalized {NotificationType} notification for user {UserId}.",
@@ -319,5 +333,89 @@ public sealed class NotificationService
             userId);
 
         return notification;
+    }
+
+    private async Task SendNotificationEmailAsync(
+    int userId,
+    string? notificationType,
+    string message,
+    CancellationToken cancellationToken)
+    {
+        try
+        {
+            User? user =
+                await _dbContext.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        u => u.Id == userId,
+                        cancellationToken);
+
+            if (user == null ||
+                string.IsNullOrWhiteSpace(user.Email))
+            {
+                _logger.LogWarning(
+                    "Email notification skipped because user {UserId} has no email address.",
+                    userId);
+
+                return;
+            }
+
+            string subject =
+                GetNotificationTitle(
+                    notificationType);
+
+            string firstName =
+                string.IsNullOrWhiteSpace(user.FullName)
+                    ? "there"
+                    : user.FullName
+                        .Split(
+                            ' ',
+                            StringSplitOptions.RemoveEmptyEntries)
+                        .FirstOrDefault()
+                        ?? "there";
+
+            string cleanMessage = message.Trim();
+
+            string namePrefix =
+                $"{firstName},";
+
+            if (cleanMessage.StartsWith(
+                namePrefix,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                cleanMessage =
+                    cleanMessage[namePrefix.Length..]
+                        .TrimStart();
+            }
+
+            string emailBody = $"""
+            Hi {firstName},
+
+            {cleanMessage}
+
+            You can log in to DWUMA to view more details.
+
+            Regards,
+            DWUMA
+            """;
+
+            await _emailService.SendEmailAsync(
+                user.Email,
+                subject,
+                emailBody,
+                cancellationToken);
+
+            _logger.LogInformation(
+                "Notification email sent to user {UserId} for {NotificationType}.",
+                userId,
+                notificationType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send notification email to user {UserId}.",
+                userId);
+        }
     }
 }

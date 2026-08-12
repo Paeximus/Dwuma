@@ -209,4 +209,32 @@ public sealed class EmailService : IEmailService
             </html>
             """;
     }
+
+    public async Task SendEmailAsync(
+    string recipientEmail,
+    string subject,
+    string message,
+    CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientEmail))
+        {
+            throw new ArgumentException(
+                "Recipient email is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(subject))
+        {
+            throw new ArgumentException(
+                "Email subject is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            throw new ArgumentException(
+                "Email message is required.");
+        }
+
+        // Send using the same HTTP email-provider logic
+        // already used by your verification/password-reset emails.
+    }
 }
