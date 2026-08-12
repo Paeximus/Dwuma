@@ -217,14 +217,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.Configure<
-    Microsoft.AspNetCore.Http.Features.FormOptions>(
-    options =>
-    {
-        options.MultipartBodyLengthLimit =
-            10 * 1024 * 1024;
-    });
-
 string jwtKey =
     builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException(

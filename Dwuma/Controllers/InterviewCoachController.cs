@@ -224,7 +224,7 @@ public sealed class InterviewCoachController : ControllerBase
     [HttpPost("video-session")]
     [DisableRateLimiting]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(60_000_000)]
+    [RequestSizeLimit(60 * 1024 * 1024)]
     public async Task<IActionResult> ProcessVideoSession(
         [FromForm] InterviewVideoSessionRequest request,
         CancellationToken cancellationToken)
